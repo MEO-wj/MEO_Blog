@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "generatedAt": "2026-04-03T10:20:30.189Z",
+  "models": [
+    {
+      "key": "ps5__dualsense-controller",
+      "name": "dualsense-controller",
+      "label": "Dualsense Controller",
+      "category": "PS5",
+      "path": "/public/models/ps5/dualsense-controller.glb",
+      "relativePath": "ps5/dualsense-controller.glb",
+      "extension": ".glb"
+    },
+    {
+      "key": "ps5__ps5-box",
+      "name": "ps5-box",
+      "label": "PS5 BOX",
+      "category": "PS5",
+      "path": "/public/models/ps5/ps5-box.glb",
+      "relativePath": "ps5/ps5-box.glb",
+      "extension": ".glb"
+    },
+    {
+      "key": "ps5__ps5-console",
+      "name": "ps5-console",
+      "label": "PS5 Console",
+      "category": "PS5",
+      "path": "/public/models/ps5/ps5-console.glb",
+      "relativePath": "ps5/ps5-console.glb",
+      "extension": ".glb"
+    }
+  ]
+}

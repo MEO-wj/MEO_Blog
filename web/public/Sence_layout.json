@@ -1,0 +1,217 @@
+{
+  "version": 2,
+  "generatedAt": "2026-05-18T17:17:14.647Z",
+  "source": "preview/ps5-test",
+  "camera": {
+    "position": {
+      "x": 1.901,
+      "y": 15.316,
+      "z": 18.701
+    },
+    "target": {
+      "x": 2.007,
+      "y": 5.788,
+      "z": 0.25
+    }
+  },
+  "items": [
+    {
+      "id": "ps5-console",
+      "assetKey": "runtime__public-models-ps5-ps5-console-glb",
+      "label": "PS5 Console",
+      "path": "/public/models/ps5/ps5-console.glb",
+      "parentId": "sci-fi-table",
+      "position": {
+        "x": -1.08,
+        "y": 0.75,
+        "z": 0.15
+      },
+      "rotationDeg": {
+        "x": 0,
+        "y": -75,
+        "z": 0
+      },
+      "scale": {
+        "x": -0.154,
+        "y": 0.154,
+        "z": 0.154
+      }
+    },
+    {
+      "id": "dualsense-controller",
+      "assetKey": "runtime__public-models-ps5-dualsense-controller-glb",
+      "label": "Dualsense Controller",
+      "path": "/public/models/ps5/dualsense-controller.glb",
+      "parentId": "sci-fi-table",
+      "position": {
+        "x": 1.081,
+        "y": 0.416,
+        "z": 0.166
+      },
+      "rotationDeg": {
+        "x": -21.03,
+        "y": -24.72,
+        "z": -25.28
+      },
+      "scale": {
+        "x": 0.07,
+        "y": 0.07,
+        "z": 0.07
+      }
+    },
+    {
+      "id": "nintendo-switch-handheld-split",
+      "assetKey": "public__models__Switch__nintendo_switch_handheld_split",
+      "label": "Nintendo Switch Handheld Split",
+      "path": "/public/models/Switch/nintendo_switch_handheld_split.glb",
+      "parentId": "sci-fi-table",
+      "position": {
+        "x": 0,
+        "y": 0.93,
+        "z": -0.22
+      },
+      "rotationDeg": {
+        "x": 90,
+        "y": 0,
+        "z": 0
+      },
+      "scale": {
+        "x": -0.06,
+        "y": 0.016,
+        "z": 0.059
+      }
+    },
+    {
+      "id": "nintendo-switch-dock-set-split",
+      "assetKey": "public__models__Switch__nintendo_switch_dock_set_split",
+      "label": "Nintendo Switch Dock SET Split",
+      "path": "/public/models/Switch/nintendo_switch_dock_set_split.glb",
+      "parentId": "sci-fi-table",
+      "position": {
+        "x": 0.914,
+        "y": 0.457,
+        "z": -0.208
+      },
+      "rotationDeg": {
+        "x": 0,
+        "y": -30,
+        "z": 0
+      },
+      "scale": {
+        "x": -0.02,
+        "y": 0.02,
+        "z": 0.02
+      }
+    },
+    {
+      "id": "sci-fi-table",
+      "assetKey": "public__models__Scene__sci-fi_table",
+      "label": "SCI FI Table",
+      "path": "/public/models/Scene/sci-fi_table.glb",
+      "parentId": null,
+      "position": {
+        "x": 1.75,
+        "y": 2,
+        "z": -6.75
+      },
+      "rotationDeg": {
+        "x": -180,
+        "y": 0,
+        "z": 0
+      },
+      "scale": {
+        "x": -6.015,
+        "y": -6.015,
+        "z": -6.015
+      }
+    },
+    {
+      "id": "sofa",
+      "assetKey": "public__models__Scene__sofa",
+      "label": "Sofa",
+      "path": "/public/models/Scene/sofa.glb",
+      "parentId": "sci-fi-table",
+      "position": {
+        "x": 0,
+        "y": 0.125,
+        "z": 1.247
+      },
+      "rotationDeg": {
+        "x": 180,
+        "y": -15,
+        "z": 180
+      },
+      "scale": {
+        "x": -0.001,
+        "y": 0.001,
+        "z": 0.001
+      }
+    },
+    {
+      "id": "trestle2",
+      "assetKey": "public__models__Scene__trestle2",
+      "label": "TRESTLE2",
+      "path": "/public/models/Scene/trestle2.glb",
+      "parentId": "sci-fi-table",
+      "position": {
+        "x": 0.064,
+        "y": 0.622,
+        "z": -0.333
+      },
+      "rotationDeg": {
+        "x": -175.91,
+        "y": 8.79,
+        "z": 92.56
+      },
+      "scale": {
+        "x": -1.816,
+        "y": 1.816,
+        "z": 1.816
+      }
+    },
+    {
+      "id": "karaoke-piranha-plant",
+      "assetKey": "public__models__Switch__karaoke_piranha_plant",
+      "label": "Karaoke Piranha Plant",
+      "path": "/public/models/Switch/karaoke_piranha_plant.glb",
+      "parentId": null,
+      "position": {
+        "x": 12.75,
+        "y": 1.89,
+        "z": -4.5
+      },
+      "rotationDeg": {
+        "x": -180,
+        "y": 0,
+        "z": 0
+      },
+      "scale": {
+        "x": -0.034,
+        "y": -0.031,
+        "z": -0.034
+      }
+    },
+    {
+      "id": "small-cabinet-right-gray",
+      "assetKey": "public__models__Scene__small_cabinet_right_gray",
+      "label": "Small Cabinet Right Gray",
+      "path": "/public/models/Scene/small_cabinet_right_gray.glb",
+      "parentId": null,
+      "position": {
+        "x": -8,
+        "y": 2.5,
+        "z": -1.25
+      },
+      "rotationDeg": {
+        "x": -180,
+        "y": 0,
+        "z": -180
+      },
+      "scale": {
+        "x": 0.308,
+        "y": 0.308,
+        "z": 0.308
+      }
+    }
+  ]
+}

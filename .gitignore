@@ -1,0 +1,19 @@
+node_modules/
+dist/
+.vite/
+.playwright-cli/
+output/
+*.log
+*.local
+
+# Go
+backend/server
+backend/server.exe
+backend/bin/
+
+# Web
+web/node_modules/
+web/dist/
+
+# Docker
+.env

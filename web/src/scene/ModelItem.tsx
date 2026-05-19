@@ -43,11 +43,13 @@ function LoadedModel({ url }: { url: string }) {
     const model = modelRef.current;
     model.updateMatrixWorld(true);
 
+    model.position.set(0, 0, 0);
+    model.updateMatrixWorld(true);
+
     const box = new THREE.Box3().setFromObject(model);
     const center = box.getCenter(new THREE.Vector3());
-    model.position.x -= center.x;
-    model.position.y -= center.y;
-    model.position.z -= center.z;
+    model.parent?.worldToLocal(center);
+    model.position.sub(center);
 
     model.traverse((obj) => {
       if ((obj as THREE.Mesh).isMesh) {

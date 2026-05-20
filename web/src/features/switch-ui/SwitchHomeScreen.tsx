@@ -15,6 +15,7 @@ import {
 } from "./switchHomeData";
 import { AdminPanel } from "./AdminPanel";
 import { ProjectDetail } from "./ProjectDetail";
+import { GitHubProfile } from "./GitHubProfile";
 import { api } from "../../api/client";
 import { useAdminStore } from "../../stores/adminStore";
 import type { Project } from "../../api/types";
@@ -40,6 +41,18 @@ type IconName =
 
 const MIN_PROJECT_SLOTS = 5;
 const GITHUB_HOME_URL = "https://github.com/meo-blog";
+
+function extractGithubUsername(url?: string): string | null {
+  if (!url) return null;
+  try {
+    const u = new URL(url);
+    if (!u.hostname.includes("github.com")) return null;
+    const seg = u.pathname.replace(/^\/|\/$/g, "").split("/")[0];
+    return seg || null;
+  } catch {
+    return null;
+  }
+}
 const ADMIN_GATE_MAX_INPUTS = 32;
 
 type AdminGateKey = "up" | "down" | "left" | "right" | "a" | "b" | "x" | "y";
@@ -349,7 +362,7 @@ export function SwitchHomeScreen({
   const [adminAuthMessage, setAdminAuthMessage] = useState("");
   const [adminPanelOpen, setAdminPanelOpen] = useState(false);
   const [detailProject, setDetailProject] = useState<Project | SwitchHomeProject | null>(null);
-  useEffect(() => { console.log("[SwitchHome] detailProject changed:", detailProject); }, [detailProject]);
+  const [showGithub, setShowGithub] = useState(false);
   const [clock, setClock] = useState(() => new Date());
 
   const { setAuthenticated: setAdminAuthenticated, profile, projects: storeProjects, rawProjects, setProjects: setStoreProjects, setProfile } = useAdminStore();
@@ -414,6 +427,14 @@ export function SwitchHomeScreen({
     if (!focused) return;
 
     function onKeyDown(event: KeyboardEvent) {
+      if (showGithub) {
+        if (event.key === "Escape") {
+          setShowGithub(false);
+          return;
+        }
+        return;
+      }
+
       if (detailProject) {
         if (event.key === "Escape") {
           setDetailProject(null);
@@ -501,7 +522,7 @@ export function SwitchHomeScreen({
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [adminPromptOpen, currentAction.id, currentProject, detailProject, focusZone, focused, onRequestExit, projectItems.length]);
+  }, [adminPromptOpen, currentAction.id, currentProject, detailProject, focusZone, focused, onRequestExit, projectItems.length, showGithub]);
 
   function resetAdminGate() {
     adminGateCodeRef.current = "";
@@ -616,7 +637,12 @@ export function SwitchHomeScreen({
     }
 
     if (actionId === "github-home") {
-      openExternal(GITHUB_HOME_URL);
+      const ghUsername = extractGithubUsername(profile?.githubUrl);
+      if (ghUsername) {
+        setShowGithub(true);
+      } else {
+        openExternal(GITHUB_HOME_URL);
+      }
       return;
     }
 
@@ -878,6 +904,13 @@ export function SwitchHomeScreen({
       {detailProject && (
         <ProjectDetail project={detailProject} onClose={() => setDetailProject(null)} />
       )}
+
+      {showGithub && (() => {
+        const ghUsername = extractGithubUsername(profile?.githubUrl);
+        return ghUsername ? (
+          <GitHubProfile username={ghUsername} onClose={() => setShowGithub(false)} />
+        ) : null;
+      })()}
     </section>
   );
 }

@@ -129,3 +129,65 @@ export interface GHContributions {
   contributions: { date: string; count: number; level: number }[];
   totalContributions: number;
 }
+
+export interface BlogCategory {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  icon: string;
+  color: string;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BlogCategoryCreate {
+  name: string;
+  slug: string;
+  description?: string;
+  icon?: string;
+  color?: string;
+  sortOrder?: number;
+}
+
+export interface BlogPost {
+  id: string;
+  slug: string;
+  title: string;
+  summary: string;
+  contentMd: string;
+  coverUrl: string;
+  status: string;
+  categoryId: string;
+  publishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BlogPostCreate {
+  slug: string;
+  title: string;
+  summary: string;
+  contentMd: string;
+  coverUrl?: string;
+  status: string;
+  categoryId: string;
+}
+
+export type BlogPostUpdate = Partial<BlogPostCreate>;
+
+export interface BlogComment {
+  id: string;
+  postId: string;
+  authorName: string;
+  authorEmail: string;
+  content: string;
+  createdAt: string;
+}
+
+export interface BlogCommentCreate {
+  authorName: string;
+  authorEmail?: string;
+  content: string;
+}

@@ -1,4 +1,4 @@
-import type { APIResponse, AdminProfile, ProfileUpdate, Project, ProjectCreate, ProjectUpdate, GHUser, GHRepo, GHContributions } from "./types";
+import type { APIResponse, AdminProfile, ProfileUpdate, Project, ProjectCreate, ProjectUpdate, GHUser, GHRepo, GHContributions, BlogCategory, BlogCategoryCreate, BlogPost, BlogPostCreate, BlogPostUpdate, BlogComment, BlogCommentCreate } from "./types";
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? "/api/v1";
 
@@ -77,4 +77,46 @@ export const api = {
     request<{ user: GHUser; repos: GHRepo[] }>(`/github/${username}`),
   getGithubContributions: (username: string) =>
     request<GHContributions>(`/github/${username}/contributions`),
+
+  // Blog (public)
+  getBlogCategories: () => request<BlogCategory[]>("/blog/categories"),
+  getBlogPosts: (categorySlug?: string) =>
+    request<BlogPost[]>(`/blog/posts${categorySlug ? `?category=${categorySlug}` : ""}`),
+  getBlogPost: (id: string) => request<BlogPost>(`/blog/posts/${id}`),
+  getBlogComments: (postId: string) => request<BlogComment[]>(`/blog/posts/${postId}/comments`),
+  createBlogComment: (postId: string, data: BlogCommentCreate) =>
+    request<BlogComment>(`/blog/posts/${postId}/comments`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  // Blog (admin)
+  adminGetBlogPosts: (categorySlug?: string) =>
+    request<BlogPost[]>(`/admin/blog/posts${categorySlug ? `?category=${categorySlug}` : ""}`),
+  createBlogCategory: (data: BlogCategoryCreate) =>
+    request<BlogCategory>("/admin/blog/categories", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  updateBlogCategory: (id: string, data: Partial<BlogCategoryCreate>) =>
+    request<BlogCategory>(`/admin/blog/categories/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+  deleteBlogCategory: (id: string) =>
+    request<void>(`/admin/blog/categories/${id}`, { method: "DELETE" }),
+  createBlogPost: (data: BlogPostCreate) =>
+    request<BlogPost>("/admin/blog/posts", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  updateBlogPost: (id: string, data: BlogPostUpdate) =>
+    request<BlogPost>(`/admin/blog/posts/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+  deleteBlogPost: (id: string) =>
+    request<void>(`/admin/blog/posts/${id}`, { method: "DELETE" }),
+  deleteBlogComment: (id: string) =>
+    request<void>(`/admin/blog/comments/${id}`, { method: "DELETE" }),
 };

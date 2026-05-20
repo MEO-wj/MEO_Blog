@@ -21,3 +21,9 @@ web/dist/
 # Temp scripts
 *.ps1
 *.bat
+
+# Claude
+.claude/
+
+# TypeScript build artifacts
+*.tsbuildinfo

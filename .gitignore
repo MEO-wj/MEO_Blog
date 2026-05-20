@@ -17,3 +17,7 @@ web/dist/
 
 # Docker
 .env
+
+# Temp scripts
+*.ps1
+*.bat

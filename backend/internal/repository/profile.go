@@ -16,6 +16,7 @@ type Profile struct {
 	City         string   `json:"city"`
 	ExtraEmails  []string `json:"extraEmails"`
 	GithubURL    string   `json:"githubUrl"`
+	ResumeURL    string   `json:"resumeUrl"`
 }
 
 type ProfileUpdate struct {
@@ -34,10 +35,10 @@ func GetProfile(ctx context.Context, db *pgxpool.Pool) (*Profile, error) {
 	err := db.QueryRow(ctx,
 		`SELECT display_name, coalesce(email,''), coalesce(bio,''), coalesce(avatar_url,''),
 		        coalesce(phone,''), coalesce(province,''), coalesce(city,''),
-		        coalesce(extra_emails, '{}'), coalesce(github_url,'')
+		        coalesce(extra_emails, '{}'), coalesce(github_url,''), coalesce(resume_url,'')
 		 FROM admin_profile LIMIT 1`,
 	).Scan(&p.DisplayName, &p.Email, &p.Bio, &p.AvatarURL,
-		&p.Phone, &p.Province, &p.City, &p.ExtraEmails, &p.GithubURL)
+		&p.Phone, &p.Province, &p.City, &p.ExtraEmails, &p.GithubURL, &p.ResumeURL)
 	if err != nil {
 		return nil, err
 	}
@@ -73,4 +74,21 @@ func UpdateAvatarURL(ctx context.Context, db *pgxpool.Pool, url string) error {
 		url,
 	)
 	return err
+}
+
+func UpdateResumeURL(ctx context.Context, db *pgxpool.Pool, url string) error {
+	_, err := db.Exec(ctx,
+		`UPDATE admin_profile SET resume_url = $1, updated_at = now()
+		 WHERE id = (SELECT id FROM admin_profile LIMIT 1)`,
+		url,
+	)
+	return err
+}
+
+func GetResumeURL(ctx context.Context, db *pgxpool.Pool) (string, error) {
+	var url string
+	err := db.QueryRow(ctx,
+		`SELECT coalesce(resume_url,'') FROM admin_profile LIMIT 1`,
+	).Scan(&url)
+	return url, err
 }

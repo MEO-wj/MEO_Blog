@@ -1,0 +1,1 @@
+ALTER TABLE admin_profile ADD COLUMN IF NOT EXISTS resume_url TEXT DEFAULT '';

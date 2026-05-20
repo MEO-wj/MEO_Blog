@@ -24,6 +24,9 @@ func NewRouter(cfg *config.Config, db *pgxpool.Pool) http.Handler {
 
 		r.Get("/projects", publicProjectsHandler(db))
 
+		r.Get("/github/{username}", githubUserHandler(cfg))
+		r.Get("/github/{username}/contributions", githubContributionsHandler(cfg))
+
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.RequireAdmin(cfg))
 

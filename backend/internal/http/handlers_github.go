@@ -1,0 +1,281 @@
+package http
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"sync"
+	"time"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/meo-blog/backend/internal/config"
+)
+
+type githubCacheEntry struct {
+	data      []byte
+	expiresAt time.Time
+}
+
+type githubProxy struct {
+	token string
+	mu    sync.RWMutex
+	cache map[string]githubCacheEntry
+}
+
+var ghProxy *githubProxy
+
+func initGitHubProxy(cfg *config.Config) {
+	ghProxy = &githubProxy{
+		token: cfg.GitHubToken,
+		cache: make(map[string]githubCacheEntry),
+	}
+}
+
+func (p *githubProxy) fetch(url string) ([]byte, int, error) {
+	p.mu.RLock()
+	if entry, ok := p.cache[url]; ok && time.Now().Before(entry.expiresAt) {
+		p.mu.RUnlock()
+		return entry.data, 200, nil
+	}
+	p.mu.RUnlock()
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, 0, err
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	if p.token != "" {
+		req.Header.Set("Authorization", "Bearer "+p.token)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer resp.Body.Close()
+
+	buf, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, resp.StatusCode, fmt.Errorf("read error: %w", err)
+	}
+
+	if resp.StatusCode == 200 {
+		p.mu.Lock()
+		p.cache[url] = githubCacheEntry{data: buf, expiresAt: time.Now().Add(10 * time.Minute)}
+		p.mu.Unlock()
+	}
+
+	return buf, resp.StatusCode, nil
+}
+
+func githubUserHandler(cfg *config.Config) http.HandlerFunc {
+	initGitHubProxy(cfg)
+
+	type ghUserData struct {
+		Login       string  `json:"login"`
+		Name        *string `json:"name"`
+		AvatarURL   string  `json:"avatar_url"`
+		Bio         *string `json:"bio"`
+		Location    *string `json:"location"`
+		Email       *string `json:"email"`
+		PublicRepos int     `json:"public_repos"`
+		Followers   int     `json:"followers"`
+		Following   int     `json:"following"`
+		HTMLURL     string  `json:"html_url"`
+	}
+
+	type ghRepoData struct {
+		ID            int     `json:"id"`
+		Name          string  `json:"name"`
+		Description   *string `json:"description"`
+		StargazersCnt int     `json:"stargazers_count"`
+		ForksCnt      int     `json:"forks_count"`
+		Language      *string `json:"language"`
+		HTMLURL       string  `json:"html_url"`
+		UpdatedAt     string  `json:"updated_at"`
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		username := chi.URLParam(r, "username")
+		if username == "" {
+			RespondError(w, "MISSING_USERNAME", "username is required", http.StatusBadRequest)
+			return
+		}
+
+		userURL := fmt.Sprintf("https://api.github.com/users/%s", username)
+		reposURL := fmt.Sprintf("https://api.github.com/users/%s/repos?sort=updated&per_page=100", username)
+
+		userData, userStatus, userErr := ghProxy.fetch(userURL)
+		if userErr != nil {
+			RespondError(w, "GITHUB_FETCH_FAILED", userErr.Error(), http.StatusBadGateway)
+			return
+		}
+		if userStatus != 200 {
+			msg := fmt.Sprintf("GitHub API returned %d", userStatus)
+			if userStatus == 403 {
+				msg = "GitHub API rate limit exceeded"
+			} else if userStatus == 404 {
+				msg = fmt.Sprintf("GitHub user '%s' not found", username)
+			}
+			RespondError(w, "GITHUB_API_ERROR", msg, userStatus)
+			return
+		}
+
+		reposData, reposStatus, reposErr := ghProxy.fetch(reposURL)
+		if reposErr != nil {
+			reposData = []byte("[]")
+			reposStatus = 200
+		}
+		_ = reposStatus
+
+		var user ghUserData
+		if err := json.Unmarshal(userData, &user); err != nil {
+			RespondError(w, "PARSE_ERROR", "failed to parse GitHub user data", http.StatusInternalServerError)
+			return
+		}
+
+		var repos []ghRepoData
+		if err := json.Unmarshal(reposData, &repos); err != nil {
+			repos = []ghRepoData{}
+		}
+
+		RespondOK(w, map[string]any{
+			"user":  user,
+			"repos": repos,
+		})
+	}
+}
+
+func githubContributionsHandler(cfg *config.Config) http.HandlerFunc {
+	type contribDay struct {
+		Date  string `json:"date"`
+		Count int    `json:"count"`
+		Level int    `json:"level"`
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		username := chi.URLParam(r, "username")
+		if username == "" {
+			RespondError(w, "MISSING_USERNAME", "username is required", http.StatusBadRequest)
+			return
+		}
+
+		// Use GitHub GraphQL API with viewer query to get ALL contributions (public + private)
+		query := map[string]string{
+			"query": `{
+				viewer {
+					contributionsCollection {
+						contributionCalendar {
+							totalContributions
+							weeks {
+								contributionDays {
+									date
+									contributionCount
+									color
+								}
+							}
+						}
+					}
+				}
+			}`,
+		}
+
+		body, err := json.Marshal(query)
+		if err != nil {
+			RespondError(w, "INTERNAL_ERROR", "failed to build request", http.StatusInternalServerError)
+			return
+		}
+
+		req, err := http.NewRequest("POST", "https://api.github.com/graphql", bytes.NewReader(body))
+		if err != nil {
+			RespondError(w, "INTERNAL_ERROR", "failed to create request", http.StatusInternalServerError)
+			return
+		}
+		req.Header.Set("Content-Type", "application/json")
+		if ghProxy.token != "" {
+			req.Header.Set("Authorization", "Bearer "+ghProxy.token)
+		}
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			RespondError(w, "CONTRIB_FETCH_FAILED", err.Error(), http.StatusBadGateway)
+			return
+		}
+		defer resp.Body.Close()
+
+		data, err := io.ReadAll(resp.Body)
+		if err != nil {
+			RespondError(w, "CONTRIB_FETCH_FAILED", "failed to read response", http.StatusBadGateway)
+			return
+		}
+
+		if resp.StatusCode != 200 {
+			RespondError(w, "CONTRIB_API_ERROR", fmt.Sprintf("GitHub GraphQL returned %d", resp.StatusCode), resp.StatusCode)
+			return
+		}
+
+		// Parse GraphQL response
+		var gqlResp struct {
+			Data struct {
+				Viewer struct {
+					ContributionsCollection struct {
+						ContributionCalendar struct {
+							TotalContributions int `json:"totalContributions"`
+							Weeks              []struct {
+								ContributionDays []struct {
+									Date              string `json:"date"`
+									ContributionCount int    `json:"contributionCount"`
+									Color             string `json:"color"`
+								} `json:"contributionDays"`
+							} `json:"weeks"`
+						} `json:"contributionCalendar"`
+					} `json:"contributionsCollection"`
+				} `json:"viewer"`
+			} `json:"data"`
+			Errors []struct {
+				Message string `json:"message"`
+			} `json:"errors"`
+		}
+
+		if err := json.Unmarshal(data, &gqlResp); err != nil {
+			RespondError(w, "PARSE_ERROR", "failed to parse GraphQL response", http.StatusInternalServerError)
+			return
+		}
+
+		if len(gqlResp.Errors) > 0 {
+			RespondError(w, "GITHUB_API_ERROR", gqlResp.Errors[0].Message, http.StatusBadGateway)
+			return
+		}
+
+		// Convert to flat list of contribution days
+		var contributions []contribDay
+		for _, week := range gqlResp.Data.Viewer.ContributionsCollection.ContributionCalendar.Weeks {
+			for _, day := range week.ContributionDays {
+				level := 0
+				if day.ContributionCount > 0 {
+					if day.ContributionCount >= 10 {
+						level = 4
+					} else if day.ContributionCount >= 5 {
+						level = 3
+					} else if day.ContributionCount >= 2 {
+						level = 2
+					} else {
+						level = 1
+					}
+				}
+				contributions = append(contributions, contribDay{
+					Date:  day.Date,
+					Count: day.ContributionCount,
+					Level: level,
+				})
+			}
+		}
+
+		RespondOK(w, map[string]any{
+			"contributions":      contributions,
+			"totalContributions": gqlResp.Data.Viewer.ContributionsCollection.ContributionCalendar.TotalContributions,
+		})
+	}
+}

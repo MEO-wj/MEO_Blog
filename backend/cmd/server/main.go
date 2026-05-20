@@ -11,6 +11,7 @@ import (
 
 	"github.com/meo-blog/backend/internal/config"
 	apihttp "github.com/meo-blog/backend/internal/http"
+	"github.com/meo-blog/backend/internal/repository"
 )
 
 func main() {
@@ -19,7 +20,22 @@ func main() {
 
 	cfg := config.Load()
 
-	router := apihttp.NewRouter(cfg)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	dbPool, err := repository.NewDBPool(ctx, cfg.DatabaseURL)
+	if err != nil {
+		slog.Error("failed to connect to database", "error", err)
+		os.Exit(1)
+	}
+	defer dbPool.Close()
+
+	if err := os.MkdirAll(cfg.UploadDir, 0o755); err != nil {
+		slog.Error("failed to create upload directory", "error", err)
+		os.Exit(1)
+	}
+
+	router := apihttp.NewRouter(cfg, dbPool)
 
 	srv := &http.Server{
 		Addr:         cfg.ServerAddr,
@@ -42,9 +58,9 @@ func main() {
 	<-quit
 
 	slog.Info("shutting down server")
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	if err := srv.Shutdown(ctx); err != nil {
+	ctx2, cancel2 := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel2()
+	if err := srv.Shutdown(ctx2); err != nil {
 		slog.Error("server forced to shutdown", "error", err)
 	}
 	slog.Info("server stopped")

@@ -1,0 +1,5 @@
+DROP TABLE IF EXISTS admin_profile;
+ALTER TABLE projects DROP COLUMN IF EXISTS icon_url;
+ALTER TABLE projects DROP COLUMN IF EXISTS accent_color;
+ALTER TABLE projects DROP COLUMN IF EXISTS category;
+ALTER TABLE projects DROP COLUMN IF EXISTS status;

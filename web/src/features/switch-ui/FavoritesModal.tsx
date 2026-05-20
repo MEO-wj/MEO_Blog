@@ -8,6 +8,22 @@ interface FavoritesModalProps {
   onClose: () => void;
 }
 
+/** Generate a stable "random" rotation for each photo based on its index */
+function photoStyle(index: number): React.CSSProperties {
+  // Deterministic pseudo-random using index
+  const seed = ((index * 7 + 3) * 13) % 100;
+  const rotation = ((seed % 7) - 3) * 1.2; // -3.6° to +3.6°
+  const tapeOffset = ((seed * 3) % 20) - 10; // -10px to +10px
+  const tapeSide = seed % 2 === 0 ? "left" : "right";
+
+  return {
+    "--photo-rotation": `${rotation}deg`,
+    "--tape-offset": `${tapeOffset}px`,
+    "--tape-side": tapeSide === "left" ? "12px" : "auto",
+    "--tape-side-r": tapeSide === "right" ? "12px" : "auto",
+  } as React.CSSProperties;
+}
+
 export function FavoritesModal({ onClose }: FavoritesModalProps) {
   const [favorites, setFavorites] = useState<Favorite[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,9 +69,9 @@ export function FavoritesModal({ onClose }: FavoritesModalProps) {
   return (
     <aside className="switch-favorites-backdrop" onClick={onClose}>
       <div className="switch-favorites-card" onClick={(e) => e.stopPropagation()}>
-        {/* Header */}
+        {/* Cork board header */}
         <div className="switch-favorites-header">
-          <span className="switch-favorites-header-icon">⭐</span>
+          <span className="switch-favorites-header-icon">📌</span>
           <strong>重要收藏</strong>
           {isAdmin && (
             <>
@@ -72,7 +88,7 @@ export function FavoritesModal({ onClose }: FavoritesModalProps) {
                 disabled={uploading}
                 onClick={() => fileInputRef.current?.click()}
               >
-                {uploading ? "上传中..." : "+ 添加"}
+                {uploading ? "上传中..." : "📌 钉上去"}
               </button>
             </>
           )}
@@ -81,7 +97,7 @@ export function FavoritesModal({ onClose }: FavoritesModalProps) {
           </button>
         </div>
 
-        {/* Body */}
+        {/* Photo wall body */}
         <div ref={scrollRef} className="switch-favorites-body">
           {loading ? (
             <div className="switch-favorites-loading">
@@ -90,36 +106,27 @@ export function FavoritesModal({ onClose }: FavoritesModalProps) {
             </div>
           ) : favorites.length === 0 ? (
             <div className="switch-favorites-empty">
-              <span className="switch-favorites-empty-icon">✨</span>
-              <span>{isAdmin ? "点击上方 + 添加 收藏图片" : "暂无收藏"}</span>
+              <span className="switch-favorites-empty-icon">📷</span>
+              <span>{isAdmin ? "点击「钉上去」添加收藏照片" : "暂无收藏"}</span>
             </div>
           ) : (
-            <div className="switch-favorites-credits">
-              {/* Cinematic intro */}
-              <div className="switch-favorites-intro">
-                <div className="switch-favorites-star-field">
-                  {Array.from({ length: 20 }).map((_, i) => (
-                    <div key={i} className="switch-favorites-star" style={{
-                      left: `${Math.random() * 100}%`,
-                      animationDelay: `${Math.random() * 3}s`,
-                      animationDuration: `${2 + Math.random() * 3}s`,
-                    }} />
-                  ))}
-                </div>
-                <h2 className="switch-favorites-title">MY COLLECTION</h2>
-                <p className="switch-favorites-subtitle">珍藏的美好瞬间</p>
-              </div>
-
-              {/* Gallery items */}
+            <div className="switch-favorites-wall">
               {favorites.map((fav, index) => (
                 <div
                   key={fav.id}
-                  className="switch-favorites-item"
-                  style={{ animationDelay: `${index * 0.1}s` }}
+                  className="switch-favorites-photo"
+                  style={photoStyle(index)}
                   onClick={() => setSelectedImage(fav)}
                 >
-                  <div className="switch-favorites-item-frame">
-                    <img src={fav.imageUrl} alt={fav.title || `收藏 ${index + 1}`} />
+                  {/* Tape strip */}
+                  <div className="switch-favorites-tape" />
+                  {/* Photo frame */}
+                  <div className="switch-favorites-photo-inner">
+                    <img
+                      src={fav.imageUrl}
+                      alt={fav.title || `收藏 ${index + 1}`}
+                      draggable={false}
+                    />
                     {isAdmin && (
                       <button
                         className="switch-favorites-delete-btn"
@@ -133,21 +140,15 @@ export function FavoritesModal({ onClose }: FavoritesModalProps) {
                       </button>
                     )}
                   </div>
+                  {/* Caption */}
                   {(fav.title || fav.description) && (
-                    <div className="switch-favorites-item-info">
-                      {fav.title && <h3>{fav.title}</h3>}
-                      {fav.description && <p>{fav.description}</p>}
+                    <div className="switch-favorites-caption">
+                      {fav.title && <span className="switch-favorites-caption-title">{fav.title}</span>}
+                      {fav.description && <span className="switch-favorites-caption-desc">{fav.description}</span>}
                     </div>
                   )}
                 </div>
               ))}
-
-              {/* Cinematic outro */}
-              <div className="switch-favorites-outro">
-                <div className="switch-favorites-divider" />
-                <p>THE END</p>
-                <div className="switch-favorites-divider" />
-              </div>
             </div>
           )}
         </div>

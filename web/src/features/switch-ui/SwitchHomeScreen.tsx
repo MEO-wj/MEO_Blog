@@ -286,7 +286,7 @@ function ProjectCard({
       <div className={`switch-project-cover ${project.iconUrl ? "has-custom-icon" : ""}`} data-icon={project.icon ?? "empty"}>
         <span className="switch-project-art" aria-hidden="true">
           {project.iconUrl ? (
-            <img src={project.iconUrl} alt="" className="switch-project-custom-icon" />
+            <img src={project.iconUrl} alt="" className="switch-project-custom-icon" draggable="false" />
           ) : (
             <span>{project.coverLabel}</span>
           )}

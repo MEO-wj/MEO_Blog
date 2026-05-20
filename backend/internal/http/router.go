@@ -29,6 +29,12 @@ func NewRouter(cfg *config.Config, db *pgxpool.Pool, rdb *redis.Client) http.Han
 
 		r.Get("/projects", publicProjectsHandler(db))
 
+		r.Get("/blog/categories", listBlogCategoriesHandler(db))
+		r.Get("/blog/posts", listBlogPostsHandler(db))
+		r.Get("/blog/posts/{id}", getBlogPostHandler(db))
+		r.Get("/blog/posts/{id}/comments", listBlogCommentsHandler(db))
+		r.Post("/blog/posts/{id}/comments", createBlogCommentHandler(db))
+
 		r.Get("/github/{username}", githubUserHandler(cfg))
 		r.Get("/github/{username}/contributions", githubContributionsHandler(cfg))
 
@@ -43,6 +49,15 @@ func NewRouter(cfg *config.Config, db *pgxpool.Pool, rdb *redis.Client) http.Han
 			r.Put("/admin/projects/{id}", updateProjectHandler(db))
 			r.Delete("/admin/projects/{id}", deleteProjectHandler(db, cfg))
 			r.Post("/admin/projects/{id}/icon", uploadProjectIconHandler(db, cfg))
+
+			r.Get("/admin/blog/posts", adminListBlogPostsHandler(db))
+			r.Post("/admin/blog/categories", adminCreateBlogCategoryHandler(db))
+			r.Put("/admin/blog/categories/{id}", adminUpdateBlogCategoryHandler(db))
+			r.Delete("/admin/blog/categories/{id}", adminDeleteBlogCategoryHandler(db))
+			r.Post("/admin/blog/posts", adminCreateBlogPostHandler(db))
+			r.Put("/admin/blog/posts/{id}", adminUpdateBlogPostHandler(db))
+			r.Delete("/admin/blog/posts/{id}", adminDeleteBlogPostHandler(db))
+			r.Delete("/admin/blog/comments/{id}", adminDeleteBlogCommentHandler(db))
 		})
 	})
 

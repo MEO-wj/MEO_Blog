@@ -30,12 +30,19 @@ func main() {
 	}
 	defer dbPool.Close()
 
+	// Initialize Redis for session management
+	rdb, err := repository.NewRedisClient(cfg.RedisAddr, cfg.RedisPassword)
+	if err != nil {
+		slog.Error("failed to connect to redis", "error", err)
+		os.Exit(1)
+	}
+
 	if err := os.MkdirAll(cfg.UploadDir, 0o755); err != nil {
 		slog.Error("failed to create upload directory", "error", err)
 		os.Exit(1)
 	}
 
-	router := apihttp.NewRouter(cfg, dbPool)
+	router := apihttp.NewRouter(cfg, dbPool, rdb)
 
 	srv := &http.Server{
 		Addr:         cfg.ServerAddr,

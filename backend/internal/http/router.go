@@ -7,9 +7,13 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/meo-blog/backend/internal/config"
 	"github.com/meo-blog/backend/internal/middleware"
+	"github.com/redis/go-redis/v9"
 )
 
-func NewRouter(cfg *config.Config, db *pgxpool.Pool) http.Handler {
+func NewRouter(cfg *config.Config, db *pgxpool.Pool, rdb *redis.Client) http.Handler {
+	// Initialize session store
+	initAdminSessions(newAdminSessionStore(rdb))
+
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
@@ -21,6 +25,7 @@ func NewRouter(cfg *config.Config, db *pgxpool.Pool) http.Handler {
 		r.Get("/health", healthHandler)
 		r.Post("/admin/login", adminLoginHandler(cfg))
 		r.Get("/admin/session", adminSessionHandler(cfg))
+		r.Post("/admin/logout", adminLogoutHandler(cfg))
 
 		r.Get("/projects", publicProjectsHandler(db))
 

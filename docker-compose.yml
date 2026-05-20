@@ -22,6 +22,7 @@ services:
       - JWT_SECRET=${JWT_SECRET}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - ADMIN_SEQUENCE=${ADMIN_SEQUENCE}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
       - UPLOAD_DIR=/app/uploads
     volumes:
       - E:/MEO_Blog_Data/uploads:/app/uploads

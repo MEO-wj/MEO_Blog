@@ -1,4 +1,4 @@
-import type { APIResponse, AdminProfile, ProfileUpdate, Project, ProjectCreate, ProjectUpdate } from "./types";
+import type { APIResponse, AdminProfile, ProfileUpdate, Project, ProjectCreate, ProjectUpdate, GHUser, GHRepo, GHContributions } from "./types";
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? "/api/v1";
 
@@ -70,4 +70,10 @@ export const api = {
       headers: {},
     });
   },
+
+  // GitHub (public, proxied through backend)
+  getGithubUser: (username: string) =>
+    request<{ user: GHUser; repos: GHRepo[] }>(`/github/${username}`),
+  getGithubContributions: (username: string) =>
+    request<GHContributions>(`/github/${username}/contributions`),
 };

@@ -66,6 +66,7 @@ export interface AdminProfile {
   province: string;
   city: string;
   extraEmails: string[];
+  githubUrl: string;
 }
 
 export interface ProfileUpdate {
@@ -76,6 +77,7 @@ export interface ProfileUpdate {
   province?: string;
   city?: string;
   extraEmails?: string[];
+  githubUrl?: string;
 }
 
 export interface ProjectCreate {
@@ -97,4 +99,33 @@ export interface Devlog {
   projectSlug: string;
   contentMd: string;
   createdAt: string;
+}
+
+export interface GHUser {
+  login: string;
+  name: string | null;
+  avatar_url: string;
+  bio: string | null;
+  location: string | null;
+  email: string | null;
+  public_repos: number;
+  followers: number;
+  following: number;
+  html_url: string;
+}
+
+export interface GHRepo {
+  id: number;
+  name: string;
+  description: string | null;
+  stargazers_count: number;
+  forks_count: number;
+  language: string | null;
+  html_url: string;
+  updated_at: string;
+}
+
+export interface GHContributions {
+  contributions: { date: string; count: number; level: number }[];
+  totalContributions: number;
 }

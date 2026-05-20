@@ -77,7 +77,7 @@ export const switchHomeActions: SwitchHomeAction[] = [
   { id: "github-home", label: "Github主页", icon: "github", accentColor: "#f0782d" },
   { id: "resume", label: "我的简历", icon: "resume", accentColor: "#49a8ff" },
   { id: "blog", label: "我的博客", icon: "blog", accentColor: "#2fcf7f" },
-  { id: "contact", label: "联系方式", icon: "contact", accentColor: "#21c6c0" },
+  { id: "contact", label: "留言墙", icon: "contact", accentColor: "#21c6c0" },
   { id: "admin", label: "管理后台", icon: "admin", accentColor: "#a9abb8" },
   { id: "power", label: "退出界面", icon: "power", accentColor: "#c5c7d2" },
 ];

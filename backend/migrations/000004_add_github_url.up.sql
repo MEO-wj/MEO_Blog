@@ -1,0 +1,1 @@
+ALTER TABLE admin_profile ADD COLUMN IF NOT EXISTS github_url TEXT DEFAULT '';

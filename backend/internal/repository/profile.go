@@ -15,6 +15,7 @@ type Profile struct {
 	Province     string   `json:"province"`
 	City         string   `json:"city"`
 	ExtraEmails  []string `json:"extraEmails"`
+	GithubURL    string   `json:"githubUrl"`
 }
 
 type ProfileUpdate struct {
@@ -25,6 +26,7 @@ type ProfileUpdate struct {
 	Province    *string  `json:"province"`
 	City        *string  `json:"city"`
 	ExtraEmails *[]string `json:"extraEmails"`
+	GithubURL   *string  `json:"githubUrl"`
 }
 
 func GetProfile(ctx context.Context, db *pgxpool.Pool) (*Profile, error) {
@@ -32,10 +34,10 @@ func GetProfile(ctx context.Context, db *pgxpool.Pool) (*Profile, error) {
 	err := db.QueryRow(ctx,
 		`SELECT display_name, coalesce(email,''), coalesce(bio,''), coalesce(avatar_url,''),
 		        coalesce(phone,''), coalesce(province,''), coalesce(city,''),
-		        coalesce(extra_emails, '{}')
+		        coalesce(extra_emails, '{}'), coalesce(github_url,'')
 		 FROM admin_profile LIMIT 1`,
 	).Scan(&p.DisplayName, &p.Email, &p.Bio, &p.AvatarURL,
-		&p.Phone, &p.Province, &p.City, &p.ExtraEmails)
+		&p.Phone, &p.Province, &p.City, &p.ExtraEmails, &p.GithubURL)
 	if err != nil {
 		return nil, err
 	}
@@ -55,10 +57,11 @@ func UpdateProfile(ctx context.Context, db *pgxpool.Pool, u *ProfileUpdate) erro
 			province = coalesce($5, province),
 			city = coalesce($6, city),
 			extra_emails = coalesce($7, extra_emails),
+			github_url = coalesce($8, github_url),
 			updated_at = now()
 		 WHERE id = (SELECT id FROM admin_profile LIMIT 1)`,
 		u.DisplayName, u.Email, u.Bio,
-		u.Phone, u.Province, u.City, u.ExtraEmails,
+		u.Phone, u.Province, u.City, u.ExtraEmails, u.GithubURL,
 	)
 	return err
 }

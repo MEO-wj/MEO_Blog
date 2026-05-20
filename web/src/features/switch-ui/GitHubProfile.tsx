@@ -55,7 +55,7 @@ export function GitHubProfile({ username, onClose }: GitHubProfileProps) {
         }
         if (!u.name && adminProfile?.displayName) u.name = adminProfile.displayName;
         setUser(u);
-        setRepos(ghData.repos.filter((r) => !r.name.includes(".github.io")).slice(0, 12));
+        setRepos(ghData.repos.filter((r) => !r.name.includes(".github.io")));
 
         if (contribData?.contributions) {
           const days: ContributionDay[] = contribData.contributions.map(

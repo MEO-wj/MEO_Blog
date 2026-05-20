@@ -180,11 +180,6 @@ function ShelfView({
 
   return (
     <div className="blog-shelf-view">
-      <div className="blog-shelf-title">
-        <span className="blog-shelf-icon">📚</span>
-        <h2>魔法书柜</h2>
-        <span className="blog-shelf-subtitle">选择一本魔法书开始阅读</span>
-      </div>
       <div className="blog-shelf">
         {categories.map((cat, i) => (
           <div

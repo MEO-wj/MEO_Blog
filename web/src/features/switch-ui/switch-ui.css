@@ -1467,8 +1467,8 @@
 }
 
 .gh-profile-card {
-  width: 960px;
-  max-height: 75vh;
+  width: 1000px;
+  max-height: 90vh;
   position: relative;
   border-radius: 16px;
   background: #0d1117;
@@ -1584,7 +1584,7 @@
 .gh-profile-header-right {
   flex: 0 0 auto;
   padding-top: 8px;
-  margin-left: -40px;
+  margin-left: -80px;
 }
 
 .gh-profile-contrib-title {
@@ -1691,6 +1691,23 @@
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 12px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.gh-profile-repos-grid::-webkit-scrollbar {
+  width: 6px;
+}
+.gh-profile-repos-grid::-webkit-scrollbar-track {
+  background: transparent;
+}
+.gh-profile-repos-grid::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+}
+.gh-profile-repos-grid::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
 }
 
 .gh-profile-repo-card {
@@ -2083,7 +2100,7 @@
 .blog-card {
   width: 1000px;
   max-width: 95%;
-  max-height: 82vh;
+  max-height: 92vh;
   display: flex;
   flex-direction: column;
   background: linear-gradient(180deg, #2a231a 0%, #1e1a14 50%, #2a231a 100%);
@@ -2184,32 +2201,12 @@
   gap: 24px;
 }
 
-.blog-shelf-title {
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-}
-.blog-shelf-icon {
-  font-size: 36px;
-}
-.blog-shelf-title h2 {
-  margin: 0;
-  font-size: 22px;
-  color: rgba(220, 200, 160, 0.95);
-}
-.blog-shelf-subtitle {
-  font-size: 13px;
-  color: rgba(180, 160, 120, 0.6);
-}
-
 .blog-shelf {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 20px;
-  padding: 12px 0;
+  gap: 24px;
+  padding: 20px 0;
 }
 
 .blog-shelf-empty {
@@ -2230,8 +2227,8 @@
 /* Book */
 .blog-book {
   position: relative;
-  width: 90px;
-  height: 130px;
+  width: 120px;
+  height: 170px;
   cursor: pointer;
   animation: blog-book-in 0.4s ease both;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -2245,7 +2242,7 @@
   left: 0;
   top: 0;
   bottom: 0;
-  width: 10px;
+  width: 14px;
   background: color-mix(in srgb, var(--book-color, #24c9f4) 80%, #000);
   border-radius: 4px 0 0 4px;
   box-shadow: inset -2px 0 4px rgba(0, 0, 0, 0.3);
@@ -2253,7 +2250,7 @@
 
 .blog-book-cover {
   position: absolute;
-  left: 10px;
+  left: 14px;
   top: 0;
   right: 0;
   bottom: 0;
@@ -2277,7 +2274,7 @@
 }
 
 .blog-book-icon {
-  font-size: 28px;
+  font-size: 36px;
   line-height: 1;
 }
 .blog-book-title {

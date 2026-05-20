@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import type { SceneLayout, LayoutItem } from "./types";
 import { ModelItem } from "./ModelItem";
+import { SwitchScreenOverlay } from "./SwitchScreenOverlay";
 
 function degToRad(deg: number): number {
   return (deg * Math.PI) / 180;
@@ -28,7 +29,23 @@ function LayoutItemGroup({ item, childrenOf }: LayoutItemGroupProps) {
   );
 }
 
-export function SceneLoader({ layout }: { layout: SceneLayout }) {
+interface SceneLoaderProps {
+  layout: SceneLayout;
+  screenFocused: boolean;
+  screenResetSignal: number;
+  onRequestScreenFocus: () => void;
+  onRequestScreenHome: () => void;
+  onRequestScreenExit: () => void;
+}
+
+export function SceneLoader({
+  layout,
+  screenFocused,
+  screenResetSignal,
+  onRequestScreenFocus,
+  onRequestScreenHome,
+  onRequestScreenExit,
+}: SceneLoaderProps) {
   const { roots, childrenOf } = useMemo(() => {
     const childrenMap = new Map<string, LayoutItem[]>();
     const rootItems: LayoutItem[] = [];
@@ -51,6 +68,13 @@ export function SceneLoader({ layout }: { layout: SceneLayout }) {
       {roots.map((item) => (
         <LayoutItemGroup key={item.id} item={item} childrenOf={childrenOf} />
       ))}
+      <SwitchScreenOverlay
+        focused={screenFocused}
+        resetSignal={screenResetSignal}
+        onRequestFocus={onRequestScreenFocus}
+        onRequestHome={onRequestScreenHome}
+        onRequestExit={onRequestScreenExit}
+      />
     </>
   );
 }

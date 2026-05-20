@@ -47,9 +47,49 @@ export interface Project {
   repoUrl: string;
   demoUrl: string;
   coverUrl: string;
+  iconUrl: string;
+  accentColor: string;
+  category: string;
+  status: string;
   techStack: string[];
   pinned: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
+
+export interface AdminProfile {
+  displayName: string;
+  email: string;
+  bio: string;
+  avatarUrl: string;
+  phone: string;
+  province: string;
+  city: string;
+  extraEmails: string[];
+}
+
+export interface ProfileUpdate {
+  displayName?: string;
+  email?: string;
+  bio?: string;
+  phone?: string;
+  province?: string;
+  city?: string;
+  extraEmails?: string[];
+}
+
+export interface ProjectCreate {
+  name: string;
+  slug: string;
+  description: string;
+  repoUrl: string;
+  iconUrl: string;
+  accentColor: string;
+  category: string;
+  status: string;
+}
+
+export type ProjectUpdate = Partial<ProjectCreate>;
 
 export interface Devlog {
   id: string;

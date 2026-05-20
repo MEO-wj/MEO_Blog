@@ -1,11 +1,11 @@
 import { Outlet, Link, useLocation } from "react-router-dom";
 
 const navItems = [
-  { path: "/dashboard", label: "Home" },
-  { path: "/posts", label: "Posts" },
-  { path: "/games", label: "Games" },
-  { path: "/projects", label: "Projects" },
-  { path: "/about", label: "About" },
+  { path: "/dashboard", label: "首页" },
+  { path: "/posts", label: "文章" },
+  { path: "/games", label: "游戏" },
+  { path: "/projects", label: "项目" },
+  { path: "/about", label: "关于" },
 ];
 
 export function Layout() {

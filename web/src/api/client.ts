@@ -1,4 +1,4 @@
-import type { APIResponse, AdminProfile, ProfileUpdate, Project, ProjectCreate, ProjectUpdate, GHUser, GHRepo, GHContributions, BlogCategory, BlogCategoryCreate, BlogPost, BlogPostCreate, BlogPostUpdate, BlogComment, BlogCommentCreate } from "./types";
+import type { APIResponse, AdminProfile, ProfileUpdate, Project, ProjectCreate, ProjectUpdate, GHUser, GHRepo, GHContributions, BlogCategory, BlogCategoryCreate, BlogPost, BlogPostCreate, BlogPostUpdate, BlogComment, BlogCommentCreate, GuestbookMessage, GuestbookMessageCreate, GuestbookReplyCreate, Favorite } from "./types";
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? "/api/v1";
 
@@ -40,6 +40,18 @@ export const api = {
     const form = new FormData();
     form.append("file", file);
     return request<{ url: string }>("/admin/avatar", {
+      method: "POST",
+      body: form,
+      headers: {},
+    });
+  },
+
+  // Resume
+  getResume: () => request<{ url: string }>("/resume"),
+  uploadResume: (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return request<{ url: string }>("/admin/resume", {
       method: "POST",
       body: form,
       headers: {},
@@ -119,4 +131,48 @@ export const api = {
     request<void>(`/admin/blog/posts/${id}`, { method: "DELETE" }),
   deleteBlogComment: (id: string) =>
     request<void>(`/admin/blog/comments/${id}`, { method: "DELETE" }),
+
+  // Guestbook (public)
+  getGuestbookMessages: () => request<GuestbookMessage[]>("/guestbook/messages"),
+  createGuestbookMessage: (data: GuestbookMessageCreate) =>
+    request<GuestbookMessage>("/guestbook/messages", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  replyToGuestbookAsUser: (id: string, data: { nickname: string; content: string }) =>
+    request<GuestbookMessage>(`/guestbook/messages/${id}/replies`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  deleteOwnGuestbookMessage: (id: string) =>
+    request<void>(`/guestbook/messages/${id}`, { method: "DELETE" }),
+
+  // Guestbook (admin)
+  replyToGuestbookMessage: (id: string, data: GuestbookReplyCreate) =>
+    request<GuestbookMessage>(`/admin/guestbook/messages/${id}/replies`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  deleteGuestbookMessage: (id: string) =>
+    request<void>(`/admin/guestbook/messages/${id}`, { method: "DELETE" }),
+  deleteGuestbookReply: (id: string) =>
+    request<void>(`/admin/guestbook/replies/${id}`, { method: "DELETE" }),
+
+  // Favorites (public)
+  getFavorites: () => request<Favorite[]>("/favorites"),
+
+  // Favorites (admin)
+  createFavorite: (file: File, title?: string, description?: string) => {
+    const form = new FormData();
+    form.append("file", file);
+    if (title) form.append("title", title);
+    if (description) form.append("description", description);
+    return request<Favorite>("/admin/favorites", {
+      method: "POST",
+      body: form,
+      headers: {},
+    });
+  },
+  deleteFavorite: (id: string) =>
+    request<void>(`/admin/favorites/${id}`, { method: "DELETE" }),
 };

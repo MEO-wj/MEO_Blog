@@ -35,6 +35,14 @@ func NewRouter(cfg *config.Config, db *pgxpool.Pool, rdb *redis.Client) http.Han
 		r.Get("/blog/posts/{id}/comments", listBlogCommentsHandler(db))
 		r.Post("/blog/posts/{id}/comments", createBlogCommentHandler(db))
 
+		r.Get("/guestbook/messages", listGuestbookMessagesHandler(db))
+		r.Post("/guestbook/messages", createGuestbookMessageHandler(db))
+		r.Post("/guestbook/messages/{id}/replies", userReplyGuestbookHandler(db))
+		r.Delete("/guestbook/messages/{id}", userDeleteGuestbookMessageHandler(db))
+
+		r.Get("/resume", getResumeHandler(db))
+		r.Get("/favorites", listFavoritesHandler(db))
+
 		r.Get("/github/{username}", githubUserHandler(cfg))
 		r.Get("/github/{username}/contributions", githubContributionsHandler(cfg))
 
@@ -44,6 +52,10 @@ func NewRouter(cfg *config.Config, db *pgxpool.Pool, rdb *redis.Client) http.Han
 			r.Get("/admin/profile", getProfileHandler(db))
 			r.Put("/admin/profile", updateProfileHandler(db))
 			r.Post("/admin/avatar", uploadAvatarHandler(db, cfg))
+			r.Post("/admin/resume", uploadResumeHandler(db, cfg))
+
+			r.Post("/admin/favorites", adminCreateFavoriteHandler(db, cfg))
+			r.Delete("/admin/favorites/{id}", adminDeleteFavoriteHandler(db, cfg))
 
 			r.Post("/admin/projects", createProjectHandler(db))
 			r.Put("/admin/projects/{id}", updateProjectHandler(db))
@@ -58,6 +70,10 @@ func NewRouter(cfg *config.Config, db *pgxpool.Pool, rdb *redis.Client) http.Han
 			r.Put("/admin/blog/posts/{id}", adminUpdateBlogPostHandler(db))
 			r.Delete("/admin/blog/posts/{id}", adminDeleteBlogPostHandler(db))
 			r.Delete("/admin/blog/comments/{id}", adminDeleteBlogCommentHandler(db))
+
+			r.Post("/admin/guestbook/messages/{id}/replies", adminReplyGuestbookHandler(db))
+			r.Delete("/admin/guestbook/messages/{id}", adminDeleteGuestbookMessageHandler(db))
+			r.Delete("/admin/guestbook/replies/{id}", adminDeleteGuestbookReplyHandler(db))
 		})
 	})
 

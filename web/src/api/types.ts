@@ -67,6 +67,7 @@ export interface AdminProfile {
   city: string;
   extraEmails: string[];
   githubUrl: string;
+  resumeUrl: string;
 }
 
 export interface ProfileUpdate {
@@ -190,4 +191,39 @@ export interface BlogCommentCreate {
   authorName: string;
   authorEmail?: string;
   content: string;
+}
+
+export interface GuestbookMessage {
+  id: string;
+  nickname: string;
+  avatarUrl: string;
+  content: string;
+  parentId?: string;
+  isAdminReply: boolean;
+  adminDisplayName?: string;
+  adminAvatarUrl?: string;
+  createdAt: string;
+  canDelete: boolean;
+  replies?: GuestbookMessage[];
+}
+
+export interface Favorite {
+  id: string;
+  title: string;
+  description: string;
+  imageUrl: string;
+  sortOrder: number;
+  createdAt: string;
+}
+
+export interface GuestbookMessageCreate {
+  nickname: string;
+  avatarUrl?: string;
+  content: string;
+}
+
+export interface GuestbookReplyCreate {
+  content: string;
+  adminDisplayName: string;
+  adminAvatarUrl?: string;
 }

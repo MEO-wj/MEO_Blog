@@ -129,7 +129,6 @@ export function GitHubProfile({ username, onClose }: GitHubProfileProps) {
             <img className="gh-profile-avatar" src={user.avatar_url} alt={user.login} />
             <div className="gh-profile-info">
               <h2 className="gh-profile-name">{user.name || user.login}</h2>
-              <p className="gh-profile-login">@{user.login}</p>
               {user.bio && <p className="gh-profile-bio">{user.bio}</p>}
               <div className="gh-profile-meta">
                 {user.location && (

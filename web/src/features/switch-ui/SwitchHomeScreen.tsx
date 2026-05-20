@@ -18,8 +18,12 @@ import { AdminPanel } from "./AdminPanel";
 import { ProjectDetail } from "./ProjectDetail";
 import { GitHubProfile } from "./GitHubProfile";
 import { BlogBookshelf } from "./BlogBookshelf";
+import { MessageWallModal } from "./MessageWallModal";
+import { ResumeModal } from "./ResumeModal";
+import { FavoritesModal } from "./FavoritesModal";
 import { api } from "../../api/client";
 import { useAdminStore } from "../../stores/adminStore";
+import { useSound } from "./useSound";
 import type { Project } from "../../api/types";
 import "./switch-ui.css";
 
@@ -241,6 +245,8 @@ function ProjectCard({
   onDeselect,
   onOpen,
   onOpenRepo,
+  onHoverSound,
+  onClickSound,
 }: {
   project: SwitchHomeProject;
   selected: boolean;
@@ -249,6 +255,8 @@ function ProjectCard({
   onDeselect: () => void;
   onOpen: () => void;
   onOpenRepo: () => void;
+  onHoverSound?: () => void;
+  onClickSound?: () => void;
 }) {
   const cardStyle = {
     "--project-accent": project.accentColor,
@@ -261,13 +269,17 @@ function ProjectCard({
       aria-label={project.title}
       aria-current={selected}
       onMouseEnter={() => {
-        if (!dragging) onSelect();
+        if (!dragging) {
+          onSelect();
+          onHoverSound?.();
+        }
       }}
       onMouseLeave={() => {
         if (!dragging) onDeselect();
       }}
       onClick={(e) => {
         console.log("[ProjectCard] click:", project.title, "target:", (e.target as HTMLElement).className);
+        onClickSound?.();
         onOpen();
       }}
     >
@@ -309,6 +321,7 @@ function ActionButton({
   onDeselect,
   onActivate,
   focused,
+  onHoverSound,
 }: {
   action: SwitchHomeAction;
   selected: boolean;
@@ -316,6 +329,7 @@ function ActionButton({
   onSelect: () => void;
   onDeselect: () => void;
   onActivate: () => void;
+  onHoverSound?: () => void;
 }) {
   const style = {
     "--action-accent": action.accentColor,
@@ -329,7 +343,10 @@ function ActionButton({
       aria-label={action.label}
       data-action-label={action.label}
       onMouseEnter={() => {
-        if (focused) onSelect();
+        if (focused) {
+          onSelect();
+          onHoverSound?.();
+        }
       }}
       onMouseLeave={() => {
         if (focused) onDeselect();
@@ -348,6 +365,7 @@ export function SwitchHomeScreen({
   onRequestFocus,
   onRequestExit,
 }: SwitchHomeScreenProps) {
+  const { play: playSound } = useSound();
   const projectRailRef = useRef<HTMLDivElement | null>(null);
   const adminPasswordInputRef = useRef<HTMLInputElement | null>(null);
   const adminGateCodeRef = useRef("");
@@ -366,6 +384,9 @@ export function SwitchHomeScreen({
   const [detailProject, setDetailProject] = useState<Project | SwitchHomeProject | null>(null);
   const [showGithub, setShowGithub] = useState(false);
   const [showBlog, setShowBlog] = useState(false);
+  const [showGuestbook, setShowGuestbook] = useState(false);
+  const [showResume, setShowResume] = useState(false);
+  const [showFavorites, setShowFavorites] = useState(false);
   const [clock, setClock] = useState(() => new Date());
 
   const { authenticated: isAdminAuthenticated, setAuthenticated: setAdminAuthenticated, profile, projects: storeProjects, rawProjects, setProjects: setStoreProjects, setProfile } = useAdminStore();
@@ -435,6 +456,7 @@ export function SwitchHomeScreen({
     function onKeyDown(event: KeyboardEvent) {
       if (showGithub) {
         if (event.key === "Escape") {
+          playSound("close");
           setShowGithub(false);
           return;
         }
@@ -443,7 +465,35 @@ export function SwitchHomeScreen({
 
       if (showBlog) {
         if (event.key === "Escape") {
+          playSound("close");
           setShowBlog(false);
+          return;
+        }
+        return;
+      }
+
+      if (showGuestbook) {
+        if (event.key === "Escape") {
+          playSound("close");
+          setShowGuestbook(false);
+          return;
+        }
+        return;
+      }
+
+      if (showResume) {
+        if (event.key === "Escape") {
+          playSound("close");
+          setShowResume(false);
+          return;
+        }
+        return;
+      }
+
+      if (showFavorites) {
+        if (event.key === "Escape") {
+          playSound("close");
+          setShowFavorites(false);
           return;
         }
         return;
@@ -451,6 +501,7 @@ export function SwitchHomeScreen({
 
       if (detailProject) {
         if (event.key === "Escape") {
+          playSound("close");
           setDetailProject(null);
           return;
         }
@@ -536,7 +587,7 @@ export function SwitchHomeScreen({
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [adminPromptOpen, currentAction.id, currentProject, detailProject, focusZone, focused, onRequestExit, projectItems.length, showBlog, showGithub]);
+  }, [adminPromptOpen, currentAction.id, currentProject, detailProject, focusZone, focused, onRequestExit, playSound, projectItems.length, showBlog, showFavorites, showGithub, showGuestbook, showResume]);
 
   function resetAdminGate() {
     adminGateCodeRef.current = "";
@@ -661,10 +712,7 @@ export function SwitchHomeScreen({
     }
 
     if (actionId === "favorites") {
-      setSelectedProject(0);
-      setSelectedAction(0);
-      setFocusZone("projects");
-      setSettingsOpen(false);
+      setShowFavorites(true);
       return;
     }
 
@@ -682,9 +730,17 @@ export function SwitchHomeScreen({
       return;
     }
 
+    if (actionId === "contact") {
+      setShowGuestbook(true);
+      return;
+    }
+
+    if (actionId === "resume") {
+      setShowResume(true);
+      return;
+    }
+
     const routes: Record<string, string> = {
-      contact: "/about",
-      resume: "/about",
     };
 
     if (routes[actionId]) {
@@ -705,7 +761,22 @@ export function SwitchHomeScreen({
       <div className="switch-screen-glow" />
       <header className="switch-topbar">
         <div className="switch-profile" aria-label="Profile">
-          <div className="switch-avatar" aria-hidden="true">
+          <div
+            className="switch-avatar"
+            role="button"
+            tabIndex={0}
+            style={{ cursor: "pointer" }}
+            onClick={() => {
+              playSound("action-click");
+              const ghUsername = extractGithubUsername(profile?.githubUrl);
+              if (ghUsername) {
+                setShowGithub(true);
+              } else {
+                openExternal(GITHUB_HOME_URL);
+              }
+            }}
+            onMouseEnter={() => playSound("action-hover")}
+          >
             {profile?.avatarUrl ? (
               <img src={profile.avatarUrl} alt="" style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover" }} />
             ) : (
@@ -774,6 +845,10 @@ export function SwitchHomeScreen({
                 setDetailProject(raw ?? project);
               }}
               onOpenRepo={() => openExternal(project.repoUrl)}
+              onHoverSound={() => playSound("project-hover")}
+              onClickSound={() => {
+                if (project.icon !== "empty") playSound("project-click");
+              }}
             />
           ))}
         </div>
@@ -796,8 +871,10 @@ export function SwitchHomeScreen({
             onActivate={() => {
               setFocusZone("actions");
               setSelectedAction(index);
+              playSound("action-click");
               activateAction(action.id);
             }}
+            onHoverSound={() => playSound("action-hover")}
           />
         ))}
       </nav>
@@ -920,25 +997,40 @@ export function SwitchHomeScreen({
       )}
 
       {adminPanelOpen && createPortal(
-        <AdminPanel onClose={() => setAdminPanelOpen(false)} />,
+        <AdminPanel onClose={() => { playSound("close"); setAdminPanelOpen(false); }} />,
         document.body,
       )}
 
       {detailProject && createPortal(
-        <ProjectDetail project={detailProject} onClose={() => setDetailProject(null)} />,
+        <ProjectDetail project={detailProject} onClose={() => { playSound("close"); setDetailProject(null); }} />,
         document.body,
       )}
 
       {showGithub && (() => {
         const ghUsername = extractGithubUsername(profile?.githubUrl);
         return ghUsername ? createPortal(
-          <GitHubProfile username={ghUsername} onClose={() => setShowGithub(false)} />,
+          <GitHubProfile username={ghUsername} onClose={() => { playSound("close"); setShowGithub(false); }} />,
           document.body,
         ) : null;
       })()}
 
       {showBlog && createPortal(
-        <BlogBookshelf onClose={() => setShowBlog(false)} />,
+        <BlogBookshelf onClose={() => { playSound("close"); setShowBlog(false); }} />,
+        document.body,
+      )}
+
+      {showGuestbook && createPortal(
+        <MessageWallModal onClose={() => { playSound("close"); setShowGuestbook(false); }} />,
+        document.body,
+      )}
+
+      {showResume && createPortal(
+        <ResumeModal onClose={() => { playSound("close"); setShowResume(false); }} />,
+        document.body,
+      )}
+
+      {showFavorites && createPortal(
+        <FavoritesModal onClose={() => { playSound("close"); setShowFavorites(false); }} />,
         document.body,
       )}
     </section>

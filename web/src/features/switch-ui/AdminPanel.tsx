@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { api } from "../../api/client";
 import type { AdminProfile, Project, ProjectCreate } from "../../api/types";
 import { useAdminStore } from "../../stores/adminStore";
@@ -379,8 +379,10 @@ function ProjectForm({
     accentColor: project?.accentColor ?? "#24c9f4",
     category: project?.category ?? "",
     status: project?.status ?? "ready",
+    techStack: project?.techStack ?? [],
   });
   const [saving, setSaving] = useState(false);
+  const [showPicker, setShowPicker] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   function autoSlug(name: string) {
@@ -527,6 +529,44 @@ function ProjectForm({
           </select>
         </label>
       </div>
+      <div className="admin-tech-stack-section">
+        <div className="admin-tech-stack-header">
+          <span>技术栈</span>
+          <button type="button" onClick={() => setShowPicker(true)}>+ 添加</button>
+        </div>
+        {form.techStack.length > 0 ? (
+          <div className="admin-tech-stack-chips">
+            {form.techStack.map((t) => (
+              <span key={t} className="admin-tech-stack-chip">
+                <img
+                  src={`/icons/tech-stack/${t}/${t}-original.svg`}
+                  alt={t}
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                />
+                <span>{t}</span>
+                <button
+                  type="button"
+                  onClick={() => setForm((f) => ({ ...f, techStack: f.techStack.filter((s) => s !== t) }))}
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        ) : (
+          <p className="admin-tech-stack-empty">暂未选择技术栈</p>
+        )}
+      </div>
+      {showPicker && (
+        <TechStackPicker
+          selected={form.techStack}
+          onConfirm={(stack) => {
+            setForm((f) => ({ ...f, techStack: stack }));
+            setShowPicker(false);
+          }}
+          onClose={() => setShowPicker(false)}
+        />
+      )}
       <div className="admin-panel-actions">
         <button type="button" onClick={onCancel}>
           取消
@@ -536,5 +576,110 @@ function ProjectForm({
         </button>
       </div>
     </form>
+  );
+}
+
+interface DeviconEntry {
+  name: string;
+  altnames: string[];
+  tags: string[];
+  versions: { svg: string[]; font: string[] };
+  color: string;
+}
+
+function TechStackPicker({
+  selected,
+  onConfirm,
+  onClose,
+}: {
+  selected: string[];
+  onConfirm: (stack: string[]) => void;
+  onClose: () => void;
+}) {
+  const [icons, setIcons] = useState<DeviconEntry[]>([]);
+  const [search, setSearch] = useState("");
+  const [picked, setPicked] = useState<Set<string>>(new Set(selected));
+  const scrollRef = useWheelScroll<HTMLDivElement>();
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    fetch("/icons/tech-stack/devicon.json")
+      .then((r) => r.json())
+      .then((data: DeviconEntry[]) => {
+        const withOriginal = data.filter((d) => d.versions.svg.includes("original"));
+        setIcons(withOriginal);
+      })
+      .catch(() => {});
+    searchRef.current?.focus();
+  }, []);
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return icons;
+    const q = search.toLowerCase();
+    return icons.filter(
+      (i) =>
+        i.name.toLowerCase().includes(q) ||
+        i.altnames.some((a) => a.toLowerCase().includes(q)) ||
+        i.tags.some((t) => t.toLowerCase().includes(q)),
+    );
+  }, [icons, search]);
+
+  function toggle(name: string) {
+    setPicked((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  }
+
+  return (
+    <div className="tech-picker-backdrop" onClick={onClose}>
+      <div className="tech-picker-card" onClick={(e) => e.stopPropagation()}>
+        <div className="tech-picker-bar">
+          <strong>选择技术栈</strong>
+          <button type="button" aria-label="关闭" onClick={onClose}>
+            ×
+          </button>
+        </div>
+        <input
+          ref={searchRef}
+          className="tech-picker-search"
+          type="text"
+          placeholder="搜索技术栈..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        <div className="tech-picker-count">
+          已选 {picked.size} 项 · 显示 {filtered.length} 项
+        </div>
+        <div ref={scrollRef} className="tech-picker-grid">
+          {filtered.map((icon) => (
+            <button
+              key={icon.name}
+              type="button"
+              className={`tech-picker-item${picked.has(icon.name) ? " selected" : ""}`}
+              onClick={() => toggle(icon.name)}
+              title={icon.altnames.length ? `${icon.name} (${icon.altnames.join(", ")})` : icon.name}
+            >
+              <img
+                src={`/icons/tech-stack/${icon.name}/${icon.name}-original.svg`}
+                alt={icon.name}
+                loading="lazy"
+              />
+              <span>{icon.name}</span>
+            </button>
+          ))}
+        </div>
+        <div className="tech-picker-actions">
+          <button type="button" onClick={onClose}>
+            取消
+          </button>
+          <button type="button" className="primary" onClick={() => onConfirm([...picked])}>
+            确认 ({picked.size})
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

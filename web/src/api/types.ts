@@ -90,6 +90,7 @@ export interface ProjectCreate {
   accentColor: string;
   category: string;
   status: string;
+  techStack: string[];
 }
 
 export type ProjectUpdate = Partial<ProjectCreate>;

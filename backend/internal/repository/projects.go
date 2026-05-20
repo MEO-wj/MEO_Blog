@@ -35,17 +35,19 @@ type ProjectCreate struct {
 	AccentColor string   `json:"accentColor"`
 	Category    string   `json:"category"`
 	Status      string   `json:"status"`
+	TechStack   []string `json:"techStack"`
 }
 
 type ProjectUpdate struct {
-	Name        *string `json:"name"`
-	Slug        *string `json:"slug"`
-	Description *string `json:"description"`
-	RepoURL     *string `json:"repoUrl"`
-	IconURL     *string `json:"iconUrl"`
-	AccentColor *string `json:"accentColor"`
-	Category    *string `json:"category"`
-	Status      *string `json:"status"`
+	Name        *string   `json:"name"`
+	Slug        *string   `json:"slug"`
+	Description *string   `json:"description"`
+	RepoURL     *string   `json:"repoUrl"`
+	IconURL     *string   `json:"iconUrl"`
+	AccentColor *string   `json:"accentColor"`
+	Category    *string   `json:"category"`
+	Status      *string   `json:"status"`
+	TechStack   *[]string `json:"techStack"`
 }
 
 func scanProject(row pgx.Row) (*Project, error) {
@@ -94,15 +96,19 @@ func ListProjects(ctx context.Context, db *pgxpool.Pool) ([]Project, error) {
 }
 
 func CreateProject(ctx context.Context, db *pgxpool.Pool, c *ProjectCreate) (*Project, error) {
+	tech := c.TechStack
+	if tech == nil {
+		tech = []string{}
+	}
 	return scanProject(db.QueryRow(ctx,
-		`INSERT INTO projects (name, slug, description, repo_url, icon_url, accent_color, category, status)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		`INSERT INTO projects (name, slug, description, repo_url, icon_url, accent_color, category, status, tech_stack)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		 RETURNING id, name, slug, coalesce(description,''),
 			coalesce(repo_url,''), coalesce(demo_url,''), coalesce(cover_url,''),
 			coalesce(icon_url,''), coalesce(accent_color,'#24c9f4'),
 			coalesce(category,''), coalesce(status,'ready'),
 			coalesce(tech_stack,'{}'), pinned, created_at, updated_at`,
-		c.Name, c.Slug, c.Description, c.RepoURL, c.IconURL, c.AccentColor, c.Category, c.Status,
+		c.Name, c.Slug, c.Description, c.RepoURL, c.IconURL, c.AccentColor, c.Category, c.Status, tech,
 	))
 }
 
@@ -117,14 +123,15 @@ func UpdateProject(ctx context.Context, db *pgxpool.Pool, id string, u *ProjectU
 			accent_color = coalesce($6, accent_color),
 			category = coalesce($7, category),
 			status = coalesce($8, status),
+			tech_stack = CASE WHEN $9::text[] IS NOT NULL THEN $9::text[] ELSE tech_stack END,
 			updated_at = now()
-		 WHERE id = $9
+		 WHERE id = $10
 		 RETURNING id, name, slug, coalesce(description,''),
 			coalesce(repo_url,''), coalesce(demo_url,''), coalesce(cover_url,''),
 			coalesce(icon_url,''), coalesce(accent_color,'#24c9f4'),
 			coalesce(category,''), coalesce(status,'ready'),
 			coalesce(tech_stack,'{}'), pinned, created_at, updated_at`,
-		u.Name, u.Slug, u.Description, u.RepoURL, u.IconURL, u.AccentColor, u.Category, u.Status, id,
+		u.Name, u.Slug, u.Description, u.RepoURL, u.IconURL, u.AccentColor, u.Category, u.Status, u.TechStack, id,
 	))
 }
 

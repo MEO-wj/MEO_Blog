@@ -70,7 +70,15 @@ export function ProjectDetail({ project, onClose }: ProjectDetailProps) {
           {techStack && techStack.length > 0 && (
             <div className="project-detail-tech">
               {techStack.map((t) => (
-                <span key={t} className="project-detail-tech-tag">{t}</span>
+                <img
+                  key={t}
+                  className="project-detail-tech-icon"
+                  src={`/icons/tech-stack/${t}/${t}-original.svg`}
+                  alt={t}
+                  title={t}
+                  loading="lazy"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                />
               ))}
             </div>
           )}
@@ -83,7 +91,10 @@ export function ProjectDetail({ project, onClose }: ProjectDetailProps) {
           )}
 
           {description && (
-            <p className="project-detail-desc">{description}</p>
+            <>
+              <hr className="project-detail-divider" />
+              <p className="project-detail-desc">{description}</p>
+            </>
           )}
 
           <div className="project-detail-actions">

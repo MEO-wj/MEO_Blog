@@ -27,6 +27,7 @@ export const api = {
       body: JSON.stringify({ password, sequence }),
     }),
   checkSession: () => request<{ authenticated: boolean }>("/admin/session"),
+  logout: () => request<{ loggedOut: boolean }>("/admin/logout", { method: "POST" }),
 
   // Profile
   getProfile: () => request<AdminProfile>("/admin/profile"),

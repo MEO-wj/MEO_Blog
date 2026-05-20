@@ -14,8 +14,18 @@ const ACCENT_COLORS = [
 
 export function AdminPanel({ onClose }: AdminPanelProps) {
   const [tab, setTab] = useState<"profile" | "projects">("profile");
-  const { setProfile, setProjects } = useAdminStore();
+  const { setProfile, setProjects, logout } = useAdminStore();
   const panelRef = useRef<HTMLElement>(null);
+
+  async function handleLogout() {
+    try {
+      await api.logout();
+    } catch {
+      // Ignore errors, clear local state anyway
+    }
+    logout();
+    onClose();
+  }
 
   useEffect(() => {
     const el = panelRef.current;
@@ -39,6 +49,9 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
           <span />
           <span />
           <strong>admin-panel.exe</strong>
+          <button type="button" className="admin-logout-btn" onClick={handleLogout}>
+            退出登录
+          </button>
           <button type="button" aria-label="关闭" onClick={onClose}>
             ×
           </button>

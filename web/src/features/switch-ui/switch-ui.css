@@ -588,6 +588,20 @@
   cursor: pointer;
 }
 
+.admin-logout-btn {
+  width: auto !important;
+  padding: 0 12px !important;
+  font-size: 12px !important;
+  font-family: inherit !important;
+  margin-left: 8px !important;
+  margin-right: 4px !important;
+}
+
+.admin-logout-btn:hover {
+  background: rgba(242, 7, 34, 0.3) !important;
+  border-color: rgba(242, 7, 34, 0.5) !important;
+}
+
 .switch-terminal-body {
   position: relative;
   z-index: 2;

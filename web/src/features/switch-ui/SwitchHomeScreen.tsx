@@ -365,11 +365,14 @@ export function SwitchHomeScreen({
   const [showGithub, setShowGithub] = useState(false);
   const [clock, setClock] = useState(() => new Date());
 
-  const { setAuthenticated: setAdminAuthenticated, profile, projects: storeProjects, rawProjects, setProjects: setStoreProjects, setProfile } = useAdminStore();
+  const { authenticated: isAdminAuthenticated, setAuthenticated: setAdminAuthenticated, profile, projects: storeProjects, rawProjects, setProjects: setStoreProjects, setProfile } = useAdminStore();
 
   useEffect(() => {
     api.getProjects().then((p) => setStoreProjects(p)).catch(() => {});
     api.getProfile().then((p) => setProfile(p)).catch(() => {});
+    api.checkSession().then((s) => {
+      if (s.authenticated) setAdminAuthenticated(true);
+    }).catch(() => {});
   }, []);
 
   const projectItems = useMemo(() => {
@@ -655,7 +658,11 @@ export function SwitchHomeScreen({
     }
 
     if (actionId === "admin") {
-      openAdminPrompt();
+      if (isAdminAuthenticated) {
+        setAdminPanelOpen(true);
+      } else {
+        openAdminPrompt();
+      }
       return;
     }
 

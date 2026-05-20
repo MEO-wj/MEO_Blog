@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../../api/client";
 import type { GHUser, GHRepo } from "../../api/types";
 import { useAdminStore } from "../../stores/adminStore";
+import { useWheelScroll } from "./useWheelScroll";
 
 interface GitHubProfileProps {
   username: string;
@@ -24,15 +25,7 @@ export function GitHubProfile({ username, onClose }: GitHubProfileProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [retryCount, setRetryCount] = useState(0);
-  const backdropRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const el = backdropRef.current;
-    if (!el) return;
-    const stop = (e: WheelEvent) => e.stopPropagation();
-    el.addEventListener("wheel", stop, { capture: true });
-    return () => el.removeEventListener("wheel", stop, { capture: true });
-  }, []);
+  const scrollRef = useWheelScroll<HTMLDivElement>();
 
   useEffect(() => {
     let cancelled = false;
@@ -103,7 +96,7 @@ export function GitHubProfile({ username, onClose }: GitHubProfileProps) {
   if (loading) {
     return (
       <div className="gh-profile-backdrop" onClick={onClose}>
-        <div className="gh-profile-card gh-profile-loading" onClick={(e) => e.stopPropagation()}>
+        <div ref={scrollRef} className="gh-profile-card gh-profile-loading" onClick={(e) => e.stopPropagation()}>
           <div className="gh-loading-spinner" />
           <p className="gh-loading-text">正在获取 GitHub 数据...</p>
         </div>
@@ -114,7 +107,7 @@ export function GitHubProfile({ username, onClose }: GitHubProfileProps) {
   if (error || !user) {
     return (
       <div className="gh-profile-backdrop" onClick={onClose}>
-        <div className="gh-profile-card gh-profile-error" onClick={(e) => e.stopPropagation()}>
+        <div ref={scrollRef} className="gh-profile-card gh-profile-error" onClick={(e) => e.stopPropagation()}>
           <p>{error || "未找到用户"}</p>
           <div className="gh-profile-error-actions">
             <button type="button" onClick={() => { setError(""); setRetryCount((c) => c + 1); }}>重试</button>
@@ -126,8 +119,8 @@ export function GitHubProfile({ username, onClose }: GitHubProfileProps) {
   }
 
   return (
-    <div ref={backdropRef} className="gh-profile-backdrop" onClick={onClose}>
-      <div className="gh-profile-card" onClick={(e) => e.stopPropagation()}>
+    <div className="gh-profile-backdrop" onClick={onClose}>
+      <div ref={scrollRef} className="gh-profile-card" onClick={(e) => e.stopPropagation()}>
         <button className="gh-profile-close" type="button" aria-label="关闭" onClick={onClose}>×</button>
 
         {/* Header: user info + contributions side by side */}

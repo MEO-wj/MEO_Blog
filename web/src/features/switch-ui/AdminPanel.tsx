@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { api } from "../../api/client";
 import type { AdminProfile, Project, ProjectCreate } from "../../api/types";
 import { useAdminStore } from "../../stores/adminStore";
+import { useWheelScroll } from "./useWheelScroll";
 
 interface AdminPanelProps {
   onClose: () => void;
@@ -15,7 +16,7 @@ const ACCENT_COLORS = [
 export function AdminPanel({ onClose }: AdminPanelProps) {
   const [tab, setTab] = useState<"profile" | "projects">("profile");
   const { setProfile, setProjects, logout } = useAdminStore();
-  const panelRef = useRef<HTMLElement>(null);
+  const scrollRef = useWheelScroll<HTMLDivElement>();
 
   async function handleLogout() {
     try {
@@ -27,19 +28,8 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
     onClose();
   }
 
-  useEffect(() => {
-    const el = panelRef.current;
-    if (!el) return;
-    const stopWheel = (e: WheelEvent) => {
-      e.stopPropagation();
-    };
-    el.addEventListener("wheel", stopWheel, { capture: true });
-    return () => el.removeEventListener("wheel", stopWheel, { capture: true });
-  }, []);
-
   return (
     <aside
-      ref={panelRef}
       className="switch-admin-panel"
       onClick={(e) => e.stopPropagation()}
     >
@@ -70,7 +60,7 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
             项目管理
           </button>
         </div>
-        <div className="admin-panel-body">
+        <div ref={scrollRef} className="admin-panel-body">
           {tab === "profile" && (
             <ProfileEditor onSave={(p) => setProfile(p)} />
           )}

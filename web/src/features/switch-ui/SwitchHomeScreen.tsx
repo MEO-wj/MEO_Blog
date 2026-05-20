@@ -6,6 +6,7 @@ import {
   type CSSProperties,
   type FormEvent,
 } from "react";
+import { createPortal } from "react-dom";
 import {
   switchHomeActions,
   switchHomeProjects,
@@ -16,6 +17,7 @@ import {
 import { AdminPanel } from "./AdminPanel";
 import { ProjectDetail } from "./ProjectDetail";
 import { GitHubProfile } from "./GitHubProfile";
+import { BlogBookshelf } from "./BlogBookshelf";
 import { api } from "../../api/client";
 import { useAdminStore } from "../../stores/adminStore";
 import type { Project } from "../../api/types";
@@ -363,6 +365,7 @@ export function SwitchHomeScreen({
   const [adminPanelOpen, setAdminPanelOpen] = useState(false);
   const [detailProject, setDetailProject] = useState<Project | SwitchHomeProject | null>(null);
   const [showGithub, setShowGithub] = useState(false);
+  const [showBlog, setShowBlog] = useState(false);
   const [clock, setClock] = useState(() => new Date());
 
   const { authenticated: isAdminAuthenticated, setAuthenticated: setAdminAuthenticated, profile, projects: storeProjects, rawProjects, setProjects: setStoreProjects, setProfile } = useAdminStore();
@@ -433,6 +436,14 @@ export function SwitchHomeScreen({
       if (showGithub) {
         if (event.key === "Escape") {
           setShowGithub(false);
+          return;
+        }
+        return;
+      }
+
+      if (showBlog) {
+        if (event.key === "Escape") {
+          setShowBlog(false);
           return;
         }
         return;
@@ -525,7 +536,7 @@ export function SwitchHomeScreen({
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [adminPromptOpen, currentAction.id, currentProject, detailProject, focusZone, focused, onRequestExit, projectItems.length, showGithub]);
+  }, [adminPromptOpen, currentAction.id, currentProject, detailProject, focusZone, focused, onRequestExit, projectItems.length, showBlog, showGithub]);
 
   function resetAdminGate() {
     adminGateCodeRef.current = "";
@@ -666,8 +677,12 @@ export function SwitchHomeScreen({
       return;
     }
 
+    if (actionId === "blog") {
+      setShowBlog(true);
+      return;
+    }
+
     const routes: Record<string, string> = {
-      blog: "/posts",
       contact: "/about",
       resume: "/about",
     };
@@ -904,20 +919,28 @@ export function SwitchHomeScreen({
         </aside>
       )}
 
-      {adminPanelOpen && (
-        <AdminPanel onClose={() => setAdminPanelOpen(false)} />
+      {adminPanelOpen && createPortal(
+        <AdminPanel onClose={() => setAdminPanelOpen(false)} />,
+        document.body,
       )}
 
-      {detailProject && (
-        <ProjectDetail project={detailProject} onClose={() => setDetailProject(null)} />
+      {detailProject && createPortal(
+        <ProjectDetail project={detailProject} onClose={() => setDetailProject(null)} />,
+        document.body,
       )}
 
       {showGithub && (() => {
         const ghUsername = extractGithubUsername(profile?.githubUrl);
-        return ghUsername ? (
-          <GitHubProfile username={ghUsername} onClose={() => setShowGithub(false)} />
+        return ghUsername ? createPortal(
+          <GitHubProfile username={ghUsername} onClose={() => setShowGithub(false)} />,
+          document.body,
         ) : null;
       })()}
+
+      {showBlog && createPortal(
+        <BlogBookshelf onClose={() => setShowBlog(false)} />,
+        document.body,
+      )}
     </section>
   );
 }

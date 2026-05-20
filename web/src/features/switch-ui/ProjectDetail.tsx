@@ -1,6 +1,7 @@
-import { useEffect, useRef } from "react";
+import type { CSSProperties } from "react";
 import type { Project } from "../../api/types";
 import type { SwitchHomeProject } from "./switchHomeData";
+import { useWheelScroll } from "./useWheelScroll";
 
 interface ProjectDetailProps {
   project: Project | SwitchHomeProject;
@@ -20,15 +21,7 @@ function isFullProject(p: Project | SwitchHomeProject): p is Project {
 
 export function ProjectDetail({ project, onClose }: ProjectDetailProps) {
   const accent = project.accentColor || "#24c9f4";
-  const backdropRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const el = backdropRef.current;
-    if (!el) return;
-    const stop = (e: WheelEvent) => e.stopPropagation();
-    el.addEventListener("wheel", stop, { capture: true });
-    return () => el.removeEventListener("wheel", stop, { capture: true });
-  }, []);
+  const scrollRef = useWheelScroll<HTMLDivElement>();
 
   const name = isFullProject(project) ? project.name : project.title;
   const description = isFullProject(project) ? project.description : project.subtitle;
@@ -41,9 +34,8 @@ export function ProjectDetail({ project, onClose }: ProjectDetailProps) {
 
   return (
     <div
-      ref={backdropRef}
       className="project-detail-backdrop"
-      style={{ "--detail-accent": accent } as React.CSSProperties}
+      style={{ "--detail-accent": accent } as CSSProperties}
       onClick={onClose}
     >
       <div
@@ -69,7 +61,7 @@ export function ProjectDetail({ project, onClose }: ProjectDetailProps) {
           )}
         </div>
 
-        <div className="project-detail-right">
+        <div ref={scrollRef} className="project-detail-right">
           <div className="project-detail-header">
             <h2 className="project-detail-title">{name}</h2>
             {category && <span className="project-detail-category">{category}</span>}

@@ -124,6 +124,7 @@ function ProfileEditor({ onSave }: { onSave: (p: AdminProfile) => void }) {
         province: profile.province,
         city: profile.city,
         extraEmails: profile.extraEmails.filter((e) => e.trim() !== ""),
+        githubUrl: profile.githubUrl,
       });
       setProfile(updated);
       onSave(updated);
@@ -231,6 +232,17 @@ function ProfileEditor({ onSave }: { onSave: (p: AdminProfile) => void }) {
           </div>
         ))}
       </div>
+      <label>
+        <span>GitHub 主页</span>
+        <input
+          type="url"
+          value={profile.githubUrl}
+          placeholder="https://github.com/username"
+          onChange={(e) =>
+            setProfile({ ...profile, githubUrl: e.target.value })
+          }
+        />
+      </label>
       <label>
         <span>个人简介</span>
         <textarea

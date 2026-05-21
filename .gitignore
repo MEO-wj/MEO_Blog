@@ -27,3 +27,6 @@ web/dist/
 
 # TypeScript build artifacts
 *.tsbuildinfo
+
+# Server deployment package
+Blog/

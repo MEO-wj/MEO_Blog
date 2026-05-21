@@ -16,6 +16,12 @@ export function useWheelScroll<T extends HTMLElement>() {
       const container = ref.current;
       if (!container) return;
 
+      // Let textarea and other scrollable inputs handle their own scrolling
+      const target = e.target as HTMLElement;
+      if (target && (target.tagName === "TEXTAREA" || target.tagName === "SELECT")) {
+        return;
+      }
+
       const { scrollHeight, clientHeight, scrollTop } = container;
       const maxScroll = scrollHeight - clientHeight;
 

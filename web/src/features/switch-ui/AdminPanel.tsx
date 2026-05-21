@@ -507,9 +507,9 @@ function ProjectForm({
         </label>
       </div>
       <label>
-        <span>项目简介</span>
+        <span>项目简介（支持 Markdown 格式）</span>
         <textarea
-          rows={3}
+          rows={6}
           value={form.description}
           onChange={(e) =>
             setForm((f) => ({ ...f, description: e.target.value }))

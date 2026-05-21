@@ -10,6 +10,8 @@ interface ResumeModalProps {
 export function ResumeModal({ onClose }: ResumeModalProps) {
   const [resumeUrl, setResumeUrl] = useState<string>("");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useWheelScroll<HTMLDivElement>();
@@ -17,11 +19,16 @@ export function ResumeModal({ onClose }: ResumeModalProps) {
   const { authenticated: isAdmin, profile, setProfile } = useAdminStore();
 
   useEffect(() => {
+    setLoading(true);
+    setError(null);
     api.getResume().then((res) => {
       setResumeUrl(res.url);
       setLoading(false);
-    }).catch(() => setLoading(false));
-  }, []);
+    }).catch(() => {
+      setLoading(false);
+      setError("加载失败，请检查网络");
+    });
+  }, [retryCount]);
 
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -57,6 +64,17 @@ export function ResumeModal({ onClose }: ResumeModalProps) {
             <div className="switch-resume-loading">
               <div className="switch-resume-loading-bar" />
               <span>Loading...</span>
+            </div>
+          ) : error ? (
+            <div className="switch-resume-loading">
+              <span>⚠️ {error}</span>
+              <button
+                className="switch-favorites-upload-btn"
+                type="button"
+                onClick={() => setRetryCount((c) => c + 1)}
+              >
+                重试
+              </button>
             </div>
           ) : resumeUrl ? (
             <div className="switch-resume-image-wrapper">

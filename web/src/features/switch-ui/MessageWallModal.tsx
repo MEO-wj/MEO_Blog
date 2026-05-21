@@ -46,17 +46,24 @@ export function MessageWallModal({ onClose }: MessageWallModalProps) {
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [replyContent, setReplyContent] = useState("");
   const [replySubmitting, setReplySubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const scrollRef = useWheelScroll<HTMLDivElement>();
   const contentRef = useRef<HTMLTextAreaElement>(null);
 
   const { authenticated: isAdmin, profile } = useAdminStore();
 
   useEffect(() => {
+    setLoading(true);
+    setError(null);
     api.getGuestbookMessages().then((m) => {
       setMessages(m);
       setLoading(false);
-    }).catch(() => setLoading(false));
-  }, []);
+    }).catch(() => {
+      setLoading(false);
+      setError("加载失败，请检查网络");
+    });
+  }, [retryCount]);
 
   useEffect(() => {
     if (contentRef.current) {
@@ -176,6 +183,18 @@ export function MessageWallModal({ onClose }: MessageWallModalProps) {
             <div className="switch-guestbook-loading">
               <div className="switch-guestbook-loading-bar" />
               <span>Loading...</span>
+            </div>
+          ) : error ? (
+            <div className="switch-guestbook-empty">
+              <span className="switch-guestbook-empty-icon">⚠️</span>
+              <span>{error}</span>
+              <button
+                className="switch-favorites-upload-btn"
+                type="button"
+                onClick={() => setRetryCount((c) => c + 1)}
+              >
+                重试
+              </button>
             </div>
           ) : messages.length === 0 ? (
             <div className="switch-guestbook-empty">

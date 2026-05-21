@@ -23,12 +23,20 @@ export function BlogBookshelf({ onClose }: BlogBookshelfProps) {
   const { authenticated: isAdmin } = useAdminStore();
   const scrollRef = useWheelScroll<HTMLDivElement>();
 
+  const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+
   useEffect(() => {
+    setLoading(true);
+    setError(null);
     api.getBlogCategories().then((c) => {
       setCategories(c);
       setLoading(false);
-    }).catch(() => setLoading(false));
-  }, []);
+    }).catch(() => {
+      setLoading(false);
+      setError("加载失败，请检查网络");
+    });
+  }, [retryCount]);
 
   function handleSelectCategory(cat: BlogCategory) {
     setSelectedCategory(cat);
@@ -99,7 +107,19 @@ export function BlogBookshelf({ onClose }: BlogBookshelfProps) {
               <p>正在打开魔法书柜...</p>
             </div>
           )}
-          {!loading && view === "shelf" && (
+          {!loading && error && (
+            <div className="blog-loading">
+              <p>⚠️ {error}</p>
+              <button
+                className="switch-favorites-upload-btn"
+                type="button"
+                onClick={() => setRetryCount((c) => c + 1)}
+              >
+                重试
+              </button>
+            </div>
+          )}
+          {!loading && !error && view === "shelf" && (
             <ShelfView
               categories={categories}
               onSelect={handleSelectCategory}

@@ -122,7 +122,8 @@ async function requestAdminLogin(password: string, sequence: string) {
   const payload = await response.json().catch(() => null);
 
   if (!response.ok) {
-    throw new Error("密码错误");
+    const msg = payload?.error?.message || "密码错误";
+    throw new Error(msg);
   }
 
   return payload?.data as { expiresAt?: string };
@@ -391,13 +392,26 @@ export function SwitchHomeScreen({
 
   const { authenticated: isAdminAuthenticated, setAuthenticated: setAdminAuthenticated, profile, projects: storeProjects, rawProjects, setProjects: setStoreProjects, setProfile } = useAdminStore();
 
+  const [dataRetryCount, setDataRetryCount] = useState(0);
+
   useEffect(() => {
     api.getProjects().then((p) => setStoreProjects(p)).catch(() => {});
-    api.getProfile().then((p) => setProfile(p)).catch(() => {});
+    api.getPublicProfile().then((p) => setProfile(p)).catch(() => {});
     api.checkSession().then((s) => {
       if (s.authenticated) setAdminAuthenticated(true);
     }).catch(() => {});
-  }, []);
+  }, [dataRetryCount]);
+
+  // Auto-retry once after 5s if data is still empty
+  useEffect(() => {
+    if (dataRetryCount > 0) return;
+    const t = setTimeout(() => {
+      if (storeProjects.length === 0 && !profile) {
+        setDataRetryCount(1);
+      }
+    }, 5000);
+    return () => clearTimeout(t);
+  }, [dataRetryCount, storeProjects.length, profile]);
 
   const projectItems = useMemo(() => {
     const source = storeProjects.length > 0 ? storeProjects : switchHomeProjects;
@@ -537,6 +551,11 @@ export function SwitchHomeScreen({
         onRequestExit();
         return;
       }
+
+      const tag = (event.target as HTMLElement)?.tagName;
+      const isTyping = tag === "TEXTAREA" || tag === "INPUT" || tag === "SELECT";
+
+      if (isTyping) return;
 
       if (event.key === "ArrowLeft") {
         event.preventDefault();
@@ -697,6 +716,7 @@ export function SwitchHomeScreen({
 
     if (actionId === "power") {
       setSettingsOpen(false);
+      setSelectedAction(-1);
       onRequestExit();
       return;
     }

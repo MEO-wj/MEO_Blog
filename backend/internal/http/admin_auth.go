@@ -21,12 +21,6 @@ const adminSessionCookieName = "meo_admin_session"
 const adminMaxLoginFailures = 5
 const adminLoginLockout = 10 * time.Minute
 
-var adminSessions *adminSessionStore
-
-func initAdminSessions(store *adminSessionStore) {
-	adminSessions = store
-}
-
 type adminLoginRequest struct {
 	Password string `json:"password"`
 	Sequence string `json:"sequence"`
@@ -82,32 +76,11 @@ func adminLoginHandler(cfg *config.Config) http.HandlerFunc {
 
 		adminClearLoginFailures(clientIP)
 
-		// Check if another admin is already logged in
-		if adminSessions != nil {
-			if existingToken, exists, _ := adminSessions.Get(r.Context()); exists && existingToken != "" {
-				// Verify the existing token is still valid
-				if verifyAdminSession(cfg.JWTSecret, existingToken) {
-					RespondError(w, "ADMIN_ALREADY_LOGGED_IN", "另一个管理员已登录，请先退出", http.StatusConflict)
-					return
-				}
-				// Existing token is invalid/expired, clear it
-				adminSessions.Delete(r.Context())
-			}
-		}
-
 		expiresAt := time.Now().Add(adminSessionTTL)
 		token, err := signAdminSession(cfg.JWTSecret, expiresAt)
 		if err != nil {
 			RespondError(w, "TOKEN_CREATE_FAILED", "failed to create admin session", http.StatusInternalServerError)
 			return
-		}
-
-		// Store session in Redis
-		if adminSessions != nil {
-			if err := adminSessions.Set(r.Context(), token); err != nil {
-				RespondError(w, "SESSION_STORE_FAILED", "failed to store session", http.StatusInternalServerError)
-				return
-			}
 		}
 
 		http.SetCookie(w, &http.Cookie{
@@ -135,14 +108,6 @@ func adminSessionHandler(cfg *config.Config) http.HandlerFunc {
 			return
 		}
 
-		// Verify session exists in Redis
-		if adminSessions != nil {
-			if matches, err := adminSessions.Matches(r.Context(), cookie.Value); err != nil || !matches {
-				RespondError(w, "ADMIN_SESSION_INVALID", "session expired or revoked", http.StatusUnauthorized)
-				return
-			}
-		}
-
 		RespondOK(w, map[string]interface{}{
 			"authenticated": true,
 		})
@@ -151,10 +116,6 @@ func adminSessionHandler(cfg *config.Config) http.HandlerFunc {
 
 func adminLogoutHandler(cfg *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if adminSessions != nil {
-			adminSessions.Delete(r.Context())
-		}
-
 		// Clear the cookie
 		http.SetCookie(w, &http.Cookie{
 			Name:     adminSessionCookieName,

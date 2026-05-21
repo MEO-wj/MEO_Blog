@@ -83,15 +83,9 @@ export function ProjectDetail({ project, onClose }: ProjectDetailProps) {
             </div>
           )}
 
-          {status && (
-            <div className="project-detail-status">
-              <span className="project-detail-status-dot" />
-              <span>{STATUS_LABELS[status] || status}</span>
-            </div>
-          )}
-
           {description && (
             <>
+              <h3 className="project-detail-subtitle">项目简介</h3>
               <hr className="project-detail-divider" />
               <p className="project-detail-desc">{description}</p>
             </>
@@ -129,6 +123,13 @@ export function ProjectDetail({ project, onClose }: ProjectDetailProps) {
             )}
           </div>
         </div>
+
+        {status && (
+          <div className="project-detail-status">
+            <span className="project-detail-status-dot" />
+            <span>{STATUS_LABELS[status] || status}</span>
+          </div>
+        )}
       </div>
     </div>
   );

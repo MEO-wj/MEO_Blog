@@ -509,6 +509,20 @@
   display: grid;
 }
 
+/* Clear stuck hover when screen is not focused (camera zooming out) */
+.is-ambient .switch-action-button.is-hovered,
+.is-ambient .switch-action-button:hover {
+  color: inherit;
+  background: transparent;
+}
+
+.is-ambient .switch-action-button.is-hovered::before,
+.is-ambient .switch-action-button.is-hovered::after,
+.is-ambient .switch-action-button:hover::before,
+.is-ambient .switch-action-button:hover::after {
+  display: none;
+}
+
 .switch-action-button svg {
   width: 36px;
   height: 36px;
@@ -1246,11 +1260,32 @@
   padding: 12px 14px;
   border: 1px solid rgba(53, 211, 154, 0.18);
   border-radius: 6px;
-  transition: border-color 0.15s;
+  transition: border-color 0.15s, opacity 0.15s, transform 0.15s;
+  cursor: grab;
 }
 
 .admin-project-row:hover {
   border-color: rgba(53, 211, 154, 0.4);
+}
+
+.admin-project-row.is-dragging {
+  opacity: 0.4;
+  cursor: grabbing;
+}
+
+.admin-project-row.is-over {
+  border-color: #35d39a;
+  box-shadow: 0 0 0 1px #35d39a;
+  transform: translateY(2px);
+}
+
+.admin-project-drag-handle {
+  color: rgba(53, 211, 154, 0.4);
+  font-size: 18px;
+  cursor: grab;
+  user-select: none;
+  flex-shrink: 0;
+  letter-spacing: 1px;
 }
 
 .admin-project-icon {
@@ -1385,9 +1420,39 @@
 }
 
 .admin-panel-msg {
-  color: #35d39a;
-  font-size: 13px;
-  margin-right: auto;
+  position: fixed;
+  bottom: 32px;
+  right: 32px;
+  color: #101214;
+  background: #35d39a;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 11px;
+  padding: 12px 20px;
+  border: 2px solid #2fc08a;
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.3);
+  z-index: 99999;
+  animation: admin-msg-in 0.3s ease, admin-msg-out 0.3s ease 1.5s forwards;
+  pointer-events: none;
+}
+
+.admin-panel-msg-error {
+  background: #e94560;
+  border-color: #c73a52;
+}
+
+@keyframes admin-msg-in {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes admin-msg-out {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(16px); }
+}
+
+.admin-profile-form .admin-bio-textarea {
+  max-height: 120px;
+  overflow-y: auto;
 }
 
 .admin-extra-emails {
@@ -2209,7 +2274,7 @@
 
 .project-detail-right {
   flex: 1;
-  padding: 32px 36px;
+  padding: 32px 36px 28px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -2268,12 +2333,23 @@
   background: rgba(255, 255, 255, 0.12);
 }
 
+.project-detail-subtitle {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+}
+
 .project-detail-status {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 13px;
   color: rgba(255, 255, 255, 0.5);
+  z-index: 2;
 }
 
 .project-detail-status-dot {
@@ -2295,15 +2371,29 @@
   font-size: 14px;
   color: rgba(255, 255, 255, 0.55);
   line-height: 1.8;
-  flex: 1;
-  min-height: 0;
+  max-height: 260px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.project-detail-desc::-webkit-scrollbar {
+  width: 5px;
+}
+.project-detail-desc::-webkit-scrollbar-track {
+  background: transparent;
+}
+.project-detail-desc::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
 }
 
 .project-detail-actions {
   display: flex;
   gap: 12px;
   margin-top: auto;
-  padding-top: 8px;
+  padding-top: 16px;
+  padding-bottom: 4px;
 }
 
 .project-detail-btn {
@@ -4122,6 +4212,19 @@
   z-index: 100 !important;
 }
 
+.switch-favorites-notice.is-admin-draggable {
+  cursor: grab;
+}
+
+.switch-favorites-notice.is-dragging {
+  cursor: grabbing;
+  transform: rotate(0deg) scale(1.05);
+  z-index: 9999 !important;
+  opacity: 0.9;
+  transition: none;
+  pointer-events: none;
+}
+
 @keyframes notice-pin {
   0% {
     opacity: 0;
@@ -4218,7 +4321,7 @@
 
 .switch-favorites-notice-photo img {
   width: 100%;
-  height: 160px;
+  height: var(--notice-photo-h, 160px);
   object-fit: cover;
   display: block;
   -webkit-user-drag: none;

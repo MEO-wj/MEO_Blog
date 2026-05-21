@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { api } from "../../api/client";
 import type { AdminProfile, Project, ProjectCreate } from "../../api/types";
 import { useAdminStore } from "../../stores/adminStore";
@@ -77,6 +77,7 @@ function ProfileEditor({ onSave }: { onSave: (p: AdminProfile) => void }) {
   const [profile, setProfile] = useState<AdminProfile | null>(null);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
+  const [msgType, setMsgType] = useState<"success" | "error">("success");
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -93,6 +94,8 @@ function ProfileEditor({ onSave }: { onSave: (p: AdminProfile) => void }) {
       onSave(updated);
     } catch {
       setMsg("头像上传失败");
+      setMsgType("error");
+      setTimeout(() => setMsg(""), 2000);
     }
   }
 
@@ -132,8 +135,12 @@ function ProfileEditor({ onSave }: { onSave: (p: AdminProfile) => void }) {
       setProfile(updated);
       onSave(updated);
       setMsg("已保存");
+      setMsgType("success");
+      setTimeout(() => setMsg(""), 2000);
     } catch {
       setMsg("保存失败");
+      setMsgType("error");
+      setTimeout(() => setMsg(""), 2000);
     }
     setSaving(false);
   }
@@ -249,6 +256,7 @@ function ProfileEditor({ onSave }: { onSave: (p: AdminProfile) => void }) {
       <label>
         <span>个人简介</span>
         <textarea
+          className="admin-bio-textarea"
           rows={4}
           value={profile.bio}
           onChange={(e) =>
@@ -257,7 +265,7 @@ function ProfileEditor({ onSave }: { onSave: (p: AdminProfile) => void }) {
         />
       </label>
       <div className="admin-panel-actions">
-        {msg && <span className="admin-panel-msg">{msg}</span>}
+        {msg && <span className={`admin-panel-msg ${msgType === "error" ? "admin-panel-msg-error" : ""}`}>{msg}</span>}
         <button type="submit" disabled={saving}>
           {saving ? "保存中..." : "保存"}
         </button>
@@ -271,6 +279,8 @@ function ProjectManager({ onSave }: { onSave: (p: Project[]) => void }) {
   const [editing, setEditing] = useState<Project | null>(null);
   const [creating, setCreating] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [overIdx, setOverIdx] = useState<number | null>(null);
 
   useEffect(() => {
     api.getProjects().then((p) => {
@@ -301,6 +311,41 @@ function ProjectManager({ onSave }: { onSave: (p: Project[]) => void }) {
     setCreating(false);
   }
 
+  const handleDragStart = useCallback((idx: number) => {
+    setDragIdx(idx);
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent, idx: number) => {
+    e.preventDefault();
+    setOverIdx(idx);
+  }, []);
+
+  const handleDrop = useCallback(async (dropIdx: number) => {
+    if (dragIdx === null || dragIdx === dropIdx) {
+      setDragIdx(null);
+      setOverIdx(null);
+      return;
+    }
+    const reordered = [...projects];
+    const [moved] = reordered.splice(dragIdx, 1);
+    reordered.splice(dropIdx, 0, moved);
+    setProjects(reordered);
+    onSave(reordered);
+    setDragIdx(null);
+    setOverIdx(null);
+
+    try {
+      await api.reorderProjects(reordered.map((p) => p.id));
+    } catch {
+      // ignore — order stays in local state
+    }
+  }, [dragIdx, projects, onSave]);
+
+  const handleDragEnd = useCallback(() => {
+    setDragIdx(null);
+    setOverIdx(null);
+  }, []);
+
   if (loading) return <p>加载中...</p>;
 
   if (creating || editing) {
@@ -327,8 +372,17 @@ function ProjectManager({ onSave }: { onSave: (p: Project[]) => void }) {
       {projects.length === 0 && (
         <p className="admin-project-empty">暂无项目，点击上方按钮新增</p>
       )}
-      {projects.map((p) => (
-        <div key={p.id} className="admin-project-row">
+      {projects.map((p, idx) => (
+        <div
+          key={p.id}
+          className={`admin-project-row${dragIdx === idx ? " is-dragging" : ""}${overIdx === idx && dragIdx !== idx ? " is-over" : ""}`}
+          draggable
+          onDragStart={() => handleDragStart(idx)}
+          onDragOver={(e) => handleDragOver(e, idx)}
+          onDrop={() => handleDrop(idx)}
+          onDragEnd={handleDragEnd}
+        >
+          <div className="admin-project-drag-handle">⠿</div>
           <div
             className="admin-project-icon"
             style={{ background: p.accentColor || "#24c9f4" }}

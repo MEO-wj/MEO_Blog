@@ -61,6 +61,28 @@ func updateProjectHandler(db *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
+func adminReorderProjectsHandler(db *pgxpool.Pool) http.HandlerFunc {
+	type reorderReq struct {
+		IDs []string `json:"ids"`
+	}
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req reorderReq
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			RespondError(w, "INVALID_JSON", "request body must be valid JSON", http.StatusBadRequest)
+			return
+		}
+		if len(req.IDs) == 0 {
+			RespondError(w, "VALIDATION_ERROR", "ids array is required", http.StatusBadRequest)
+			return
+		}
+		if err := repository.ReorderProjects(r.Context(), db, req.IDs); err != nil {
+			RespondError(w, "REORDER_FAILED", "failed to reorder projects", http.StatusInternalServerError)
+			return
+		}
+		RespondOK(w, map[string]string{"status": "ok"})
+	}
+}
+
 func deleteProjectHandler(db *pgxpool.Pool, cfg *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")

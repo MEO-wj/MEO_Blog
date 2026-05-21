@@ -22,6 +22,7 @@ type Project struct {
 	Status      string   `json:"status"`
 	TechStack   []string `json:"techStack"`
 	Pinned      bool     `json:"pinned"`
+	SortOrder   int      `json:"sortOrder"`
 	CreatedAt   string   `json:"createdAt"`
 	UpdatedAt   string   `json:"updatedAt"`
 }
@@ -50,6 +51,12 @@ type ProjectUpdate struct {
 	TechStack   *[]string `json:"techStack"`
 }
 
+const projectSelectCols = `id, name, slug, coalesce(description,''),
+	coalesce(repo_url,''), coalesce(demo_url,''), coalesce(cover_url,''),
+	coalesce(icon_url,''), coalesce(accent_color,'#24c9f4'),
+	coalesce(category,''), coalesce(status,'ready'),
+	coalesce(tech_stack,'{}'), pinned, sort_order, created_at, updated_at`
+
 func scanProject(row pgx.Row) (*Project, error) {
 	var p Project
 	var createdAt, updatedAt time.Time
@@ -57,7 +64,7 @@ func scanProject(row pgx.Row) (*Project, error) {
 		&p.ID, &p.Name, &p.Slug, &p.Description,
 		&p.RepoURL, &p.DemoURL, &p.CoverURL,
 		&p.IconURL, &p.AccentColor, &p.Category, &p.Status,
-		&p.TechStack, &p.Pinned, &createdAt, &updatedAt,
+		&p.TechStack, &p.Pinned, &p.SortOrder, &createdAt, &updatedAt,
 	)
 	if err != nil {
 		return nil, err
@@ -69,12 +76,8 @@ func scanProject(row pgx.Row) (*Project, error) {
 
 func ListProjects(ctx context.Context, db *pgxpool.Pool) ([]Project, error) {
 	rows, err := db.Query(ctx,
-		`SELECT id, name, slug, coalesce(description,''),
-			coalesce(repo_url,''), coalesce(demo_url,''), coalesce(cover_url,''),
-			coalesce(icon_url,''), coalesce(accent_color,'#24c9f4'),
-			coalesce(category,''), coalesce(status,'ready'),
-			coalesce(tech_stack,'{}'), pinned, created_at, updated_at
-		 FROM projects ORDER BY pinned DESC, created_at DESC`,
+		`SELECT `+projectSelectCols+`
+		 FROM projects ORDER BY sort_order ASC, created_at DESC`,
 	)
 	if err != nil {
 		return nil, err
@@ -101,13 +104,9 @@ func CreateProject(ctx context.Context, db *pgxpool.Pool, c *ProjectCreate) (*Pr
 		tech = []string{}
 	}
 	return scanProject(db.QueryRow(ctx,
-		`INSERT INTO projects (name, slug, description, repo_url, icon_url, accent_color, category, status, tech_stack)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-		 RETURNING id, name, slug, coalesce(description,''),
-			coalesce(repo_url,''), coalesce(demo_url,''), coalesce(cover_url,''),
-			coalesce(icon_url,''), coalesce(accent_color,'#24c9f4'),
-			coalesce(category,''), coalesce(status,'ready'),
-			coalesce(tech_stack,'{}'), pinned, created_at, updated_at`,
+		`INSERT INTO projects (name, slug, description, repo_url, icon_url, accent_color, category, status, tech_stack, sort_order)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, (SELECT COALESCE(MAX(sort_order), -1) + 1 FROM projects))
+		 RETURNING `+projectSelectCols,
 		c.Name, c.Slug, c.Description, c.RepoURL, c.IconURL, c.AccentColor, c.Category, c.Status, tech,
 	))
 }
@@ -126,13 +125,25 @@ func UpdateProject(ctx context.Context, db *pgxpool.Pool, id string, u *ProjectU
 			tech_stack = CASE WHEN $9::text[] IS NOT NULL THEN $9::text[] ELSE tech_stack END,
 			updated_at = now()
 		 WHERE id = $10
-		 RETURNING id, name, slug, coalesce(description,''),
-			coalesce(repo_url,''), coalesce(demo_url,''), coalesce(cover_url,''),
-			coalesce(icon_url,''), coalesce(accent_color,'#24c9f4'),
-			coalesce(category,''), coalesce(status,'ready'),
-			coalesce(tech_stack,'{}'), pinned, created_at, updated_at`,
+		 RETURNING `+projectSelectCols,
 		u.Name, u.Slug, u.Description, u.RepoURL, u.IconURL, u.AccentColor, u.Category, u.Status, u.TechStack, id,
 	))
+}
+
+func ReorderProjects(ctx context.Context, db *pgxpool.Pool, ids []string) error {
+	tx, err := db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	for i, id := range ids {
+		if _, err := tx.Exec(ctx, `UPDATE projects SET sort_order = $1, updated_at = now() WHERE id = $2`, i, id); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit(ctx)
 }
 
 func DeleteProject(ctx context.Context, db *pgxpool.Pool, id string) error {

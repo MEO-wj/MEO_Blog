@@ -1,24 +1,94 @@
-import { useEffect, useRef, useState } from "react";
+import { Component, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { useLoader } from "@react-three/fiber";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { MeshoptDecoder } from "meshoptimizer";
 import type { LayoutItem } from "./types";
 import { resolveAssetPath, getCachedModelUrl } from "./modelUtils";
+import { useSceneStore } from "../stores/sceneStore";
+
+function configureLoader(loader: GLTFLoader) {
+  loader.setMeshoptDecoder(MeshoptDecoder);
+}
+
+// --- Error boundary for GLTF parsing failures ---
+
+interface EBState {
+  hasError: boolean;
+}
+
+class ModelErrorBoundary extends Component<
+  { children: React.ReactNode; onError: () => void },
+  EBState
+> {
+  state: EBState = { hasError: false };
+
+  static getDerivedStateFromError(): EBState {
+    return { hasError: true };
+  }
+
+  componentDidCatch() {
+    this.props.onError();
+  }
+
+  render() {
+    if (this.state.hasError) return null;
+    return this.props.children;
+  }
+}
+
+// --- Main component ---
 
 export function ModelItem({ item }: { item: LayoutItem }) {
   const [url, setUrl] = useState<string | null>(null);
+  const [gltfRetryKey, setGltfRetryKey] = useState(0);
+  const [dead, setDead] = useState(false);
+  const registerModel = useSceneStore((s) => s.registerModel);
+  const modelLoaded = useSceneStore((s) => s.modelLoaded);
+  const registered = useRef(false);
+  const loaded = useRef(false);
 
+  // Register exactly once
   useEffect(() => {
+    if (!registered.current) {
+      registered.current = true;
+      registerModel();
+    }
+  }, [registerModel]);
+
+  // Fetch with retry — do NOT call modelLoaded() on failure
+  useEffect(() => {
+    if (dead) return;
     const assetPath = resolveAssetPath(item);
     let revoked = false;
     let blobUrl: string | undefined;
 
-    getCachedModelUrl(assetPath).then((resolvedUrl) => {
-      if (!revoked) {
-        blobUrl = resolvedUrl;
-        setUrl(resolvedUrl);
+    (async () => {
+      const maxRetries = 5;
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+          const resolvedUrl = await getCachedModelUrl(assetPath);
+          if (!revoked) {
+            blobUrl = resolvedUrl;
+            setUrl(resolvedUrl);
+          }
+          return; // success
+        } catch {
+          if (revoked) return;
+          if (attempt < maxRetries - 1) {
+            // Exponential backoff: 1s, 2s, 4s, 8s
+            await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, attempt)));
+          }
+        }
       }
-    });
+      // All retries exhausted — mark as loaded so overlay doesn't get stuck
+      // but set dead=true so we don't keep retrying
+      if (!revoked && !loaded.current) {
+        loaded.current = true;
+        setDead(true);
+        modelLoaded();
+      }
+    })();
 
     return () => {
       revoked = true;
@@ -26,16 +96,41 @@ export function ModelItem({ item }: { item: LayoutItem }) {
         URL.revokeObjectURL(blobUrl);
       }
     };
-  }, [item.id, item.path]);
+  }, [item.id, item.path, modelLoaded, dead]);
 
-  if (!url) return null;
+  // Called when GLTF parsing succeeds
+  const handleModelLoaded = () => {
+    if (!loaded.current) {
+      loaded.current = true;
+      modelLoaded();
+    }
+  };
 
-  return <LoadedModel url={url} />;
+  // Called when GLTF parsing fails — retry by bumping key
+  const handleGltfError = () => {
+    if (gltfRetryKey < 3) {
+      setGltfRetryKey((k) => k + 1);
+    } else if (!loaded.current) {
+      // Exhausted GLTF retries — give up and count as loaded
+      loaded.current = true;
+      setDead(true);
+      modelLoaded();
+    }
+  };
+
+  if (!url || dead) return null;
+
+  return (
+    <ModelErrorBoundary key={gltfRetryKey} onError={handleGltfError}>
+      <LoadedModel url={url} onLoaded={handleModelLoaded} />
+    </ModelErrorBoundary>
+  );
 }
 
-function LoadedModel({ url }: { url: string }) {
-  const gltf = useLoader(GLTFLoader, url);
+function LoadedModel({ url, onLoaded }: { url: string; onLoaded: () => void }) {
+  const gltf = useLoader(GLTFLoader, url, configureLoader);
   const modelRef = useRef<THREE.Group>(null);
+  const reported = useRef(false);
 
   useEffect(() => {
     if (!modelRef.current) return;
@@ -65,7 +160,12 @@ function LoadedModel({ url }: { url: string }) {
         }
       }
     });
-  }, [gltf]);
+
+    if (!reported.current) {
+      reported.current = true;
+      onLoaded();
+    }
+  }, [gltf, onLoaded]);
 
   return (
     <group ref={modelRef}>

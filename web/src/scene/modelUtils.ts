@@ -1,6 +1,6 @@
 import type { LayoutItem } from "./types";
 
-const MODEL_CACHE = "meo-blog-model-cache-v1";
+const MODEL_CACHE = "meo-blog-model-cache-v2";
 
 const PATH_OVERRIDES: Record<string, string> = {
   "ps5-console": "/model/PS5/ps5-console.glb",
@@ -24,6 +24,23 @@ export function resolveAssetPath(item: LayoutItem): string {
     .replace(/^\/public\/models\//, "/model/");
 }
 
+async function fetchWithRetry(url: string, retries = 5): Promise<Response> {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const res = await fetch(url, { cache: "force-cache" });
+      if (res.ok) return res;
+      if (i < retries - 1) await delay(1000 * Math.pow(2, i));
+    } catch {
+      if (i < retries - 1) await delay(1000 * Math.pow(2, i));
+    }
+  }
+  throw new Error(`Failed after ${retries} retries: ${url}`);
+}
+
+function delay(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
 export async function getCachedModelUrl(assetPath: string): Promise<string> {
   if (!("caches" in window)) return assetPath;
 
@@ -35,11 +52,11 @@ export async function getCachedModelUrl(assetPath: string): Promise<string> {
     return URL.createObjectURL(await cached.blob());
   }
 
-  const response = await fetch(absoluteUrl, { cache: "force-cache" });
-  if (!response.ok) {
-    throw new Error(`Model request failed: ${assetPath} (${response.status})`);
-  }
+  const response = await fetchWithRetry(absoluteUrl);
 
-  await cache.put(absoluteUrl, response.clone());
+  // Only cache successful responses with actual content
+  if ((response.headers.get("content-length") ?? "0") !== "0") {
+    await cache.put(absoluteUrl, response.clone());
+  }
   return URL.createObjectURL(await response.blob());
 }

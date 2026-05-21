@@ -2,7 +2,11 @@ package http
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/meo-blog/backend/internal/config"
@@ -37,6 +41,40 @@ func updateProfileHandler(db *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		RespondOK(w, profile)
+	}
+}
+
+// Public: get profile (read-only, no auth required)
+func publicProfileHandler(db *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		profile, err := repository.GetProfile(r.Context(), db)
+		if err != nil {
+			RespondError(w, "PROFILE_NOT_FOUND", "profile not found", http.StatusNotFound)
+			return
+		}
+		RespondOK(w, profile)
+	}
+}
+
+// Public: serve favicon — reads admin avatar from disk or returns default SVG
+func faviconHandler(db *pgxpool.Pool, cfg *config.Config) http.HandlerFunc {
+	defaultSVG := `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#05070d"/><path d="M8 21V9h4l4 6 4-6h4v12h-4v-6l-4 6-4-6v6H8Z" fill="#63e6be"/></svg>`
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+		w.Header().Set("Pragma", "no-cache")
+
+		profile, err := repository.GetProfile(r.Context(), db)
+		if err == nil && profile.AvatarURL != "" {
+			filePath := filepath.Join(cfg.UploadDir, strings.TrimPrefix(profile.AvatarURL, "/uploads/"))
+			data, ferr := os.ReadFile(filePath)
+			if ferr == nil {
+				w.Header().Set("Content-Type", "image/jpeg")
+				w.Write(data)
+				return
+			}
+		}
+		w.Header().Set("Content-Type", "image/svg+xml")
+		fmt.Fprint(w, defaultSVG)
 	}
 }
 

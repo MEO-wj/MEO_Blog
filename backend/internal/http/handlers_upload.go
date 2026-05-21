@@ -1,7 +1,11 @@
 package http
 
 import (
+	"bytes"
 	"fmt"
+	"image"
+	"image/jpeg"
+	"image/png"
 	"io"
 	"net/http"
 	"os"
@@ -13,6 +17,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/meo-blog/backend/internal/config"
 	"github.com/meo-blog/backend/internal/repository"
+	"golang.org/x/image/draw"
 )
 
 var allowedMimeTypes = map[string]string{
@@ -84,6 +89,25 @@ func handleFileUpload(r *http.Request, cfg *config.Config, maxSize int64) (strin
 	filename := uuid.New().String() + ext
 	destPath := filepath.Join(cfg.UploadDir, filename)
 
+	// Compress raster images (skip SVG and GIF animations)
+	if ext != ".svg" && ext != ".gif" {
+		data, err := io.ReadAll(file)
+		if err != nil {
+			return "", fmt.Errorf("failed to read file")
+		}
+		compressed, newExt, err := compressImage(data, ext)
+		if err == nil && len(compressed) < len(data) {
+			// Use compressed version if smaller
+			oldPath := destPath
+			filename = uuid.New().String() + newExt
+			destPath = filepath.Join(cfg.UploadDir, filename)
+			os.Remove(oldPath)
+			return "/uploads/" + filename, os.WriteFile(destPath, compressed, 0644)
+		}
+		// Fallback: write original
+		return "/uploads/" + filename, os.WriteFile(destPath, data, 0644)
+	}
+
 	dst, err := os.Create(destPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to save file")
@@ -95,6 +119,71 @@ func handleFileUpload(r *http.Request, cfg *config.Config, maxSize int64) (strin
 	}
 
 	return "/uploads/" + filename, nil
+}
+
+const maxDimension = 2048
+
+// compressImage decodes a raster image, resizes if too large, and re-encodes as JPEG.
+func compressImage(data []byte, ext string) ([]byte, string, error) {
+	src, _, err := image.Decode(bytes.NewReader(data))
+	if err != nil {
+		return nil, "", err
+	}
+
+	bounds := src.Bounds()
+	w, h := bounds.Dx(), bounds.Dy()
+
+	// Resize if either dimension exceeds limit
+	if w > maxDimension || h > maxDimension {
+		ratio := float64(maxDimension) / float64(w)
+		if h > w {
+			ratio = float64(maxDimension) / float64(h)
+		}
+		nw := int(float64(w) * ratio)
+		nh := int(float64(h) * ratio)
+		dst := image.NewRGBA(image.Rect(0, 0, nw, nh))
+		draw.CatmullRom.Scale(dst, dst.Bounds(), src, bounds, draw.Over, nil)
+		src = dst
+	}
+
+	// PNG with transparency → re-encode as compressed PNG
+	if ext == ".png" {
+		if hasAlpha(data) {
+			var buf bytes.Buffer
+			enc := png.Encoder{CompressionLevel: png.BestCompression}
+			if err := enc.Encode(&buf, src); err != nil {
+				return nil, "", err
+			}
+			return buf.Bytes(), ".png", nil
+		}
+		// PNG without transparency → JPEG
+		ext = ".jpg"
+	}
+
+	// Default: JPEG with quality 80
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, src, &jpeg.Options{Quality: 80}); err != nil {
+		return nil, "", err
+	}
+	return buf.Bytes(), ext, nil
+}
+
+// hasAlpha checks if a PNG has meaningful alpha channel.
+func hasAlpha(data []byte) bool {
+	img, err := png.Decode(bytes.NewReader(data))
+	if err != nil {
+		return false
+	}
+	// Check if any pixel has non-opaque alpha
+	for y := img.Bounds().Min.Y; y < img.Bounds().Max.Y; y += 4 {
+		for x := img.Bounds().Min.X; x < img.Bounds().Max.X; x += 4 {
+			_, _, _, a := img.At(x, y).RGBA()
+			if a < 0xFFFF {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func serveUploadHandler(cfg *config.Config) http.HandlerFunc {

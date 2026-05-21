@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "sharp": "^0.34.5"
+  },
+  "devDependencies": {
+    "@gltf-transform/cli": "^4.3.0"
+  }
+}

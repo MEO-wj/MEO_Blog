@@ -10,10 +10,7 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-func NewRouter(cfg *config.Config, db *pgxpool.Pool, rdb *redis.Client) http.Handler {
-	// Initialize session store
-	initAdminSessions(newAdminSessionStore(rdb))
-
+func NewRouter(cfg *config.Config, db *pgxpool.Pool, _ *redis.Client) http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
@@ -23,11 +20,13 @@ func NewRouter(cfg *config.Config, db *pgxpool.Pool, rdb *redis.Client) http.Han
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Get("/health", healthHandler)
+		r.Get("/favicon", faviconHandler(db, cfg))
 		r.Post("/admin/login", adminLoginHandler(cfg))
 		r.Get("/admin/session", adminSessionHandler(cfg))
 		r.Post("/admin/logout", adminLogoutHandler(cfg))
 
 		r.Get("/projects", publicProjectsHandler(db))
+		r.Get("/profile", publicProfileHandler(db))
 
 		r.Get("/blog/categories", listBlogCategoriesHandler(db))
 		r.Get("/blog/posts", listBlogPostsHandler(db))
@@ -55,9 +54,11 @@ func NewRouter(cfg *config.Config, db *pgxpool.Pool, rdb *redis.Client) http.Han
 			r.Post("/admin/resume", uploadResumeHandler(db, cfg))
 
 			r.Post("/admin/favorites", adminCreateFavoriteHandler(db, cfg))
+			r.Patch("/admin/favorites/{id}/position", adminUpdateFavoritePositionHandler(db))
 			r.Delete("/admin/favorites/{id}", adminDeleteFavoriteHandler(db, cfg))
 
 			r.Post("/admin/projects", createProjectHandler(db))
+			r.Put("/admin/projects/reorder", adminReorderProjectsHandler(db))
 			r.Put("/admin/projects/{id}", updateProjectHandler(db))
 			r.Delete("/admin/projects/{id}", deleteProjectHandler(db, cfg))
 			r.Post("/admin/projects/{id}/icon", uploadProjectIconHandler(db, cfg))

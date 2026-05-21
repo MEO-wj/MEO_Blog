@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../../api/client";
 import type { Favorite } from "../../api/types";
 import { useAdminStore } from "../../stores/adminStore";
@@ -10,22 +10,47 @@ interface FavoritesModalProps {
 
 /**
  * Generate deterministic pseudo-random layout for each quest notice.
- * Uses a simple seed-based PRNG so positions are stable across renders.
+ * Adjusts card size based on image aspect ratio.
  */
-function noticeLayout(index: number) {
+function noticeLayout(index: number, imgW?: number, imgH?: number) {
   // Seed from index
   const s = (index * 2654435761) >>> 0; // Knuth multiplicative hash
   const r = (n: number) => ((s * (n + 1) * 7 + 13) % 1000) / 1000; // 0-1
 
   const rotation = (r(1) - 0.5) * 12; // -6° to +6°
-  const width = 220 + Math.floor(r(2) * 60); // 220-280px
+
+  // Determine card width and photo height based on image aspect ratio
+  let width: number;
+  let photoH: number;
+
+  if (imgW && imgH && imgW > 0 && imgH > 0) {
+    const ratio = imgW / imgH;
+    if (ratio < 0.8) {
+      // Tall/portrait: narrow card, taller photo
+      width = 200 + Math.floor(r(2) * 30);
+      photoH = 240 + Math.floor(r(6) * 40);
+    } else if (ratio > 1.2) {
+      // Wide/landscape: wider card, shorter photo
+      width = 270 + Math.floor(r(2) * 40);
+      photoH = 130 + Math.floor(r(6) * 30);
+    } else {
+      // Square-ish: balanced
+      width = 230 + Math.floor(r(2) * 40);
+      photoH = 170 + Math.floor(r(6) * 30);
+    }
+  } else {
+    // Fallback for old data without dimensions
+    width = 220 + Math.floor(r(2) * 60);
+    photoH = 160;
+  }
+
+  const rowH = photoH + 120; // photo + text + padding
 
   // Grid-based placement with jitter for scattered look
   const cols = 4;
   const col = index % cols;
   const row = Math.floor(index / cols);
   const colW = 260;
-  const rowH = 310;
   const baseX = 30 + col * colW;
   const baseY = 20 + row * rowH;
   const jitterX = (r(3) - 0.5) * 60;
@@ -36,25 +61,42 @@ function noticeLayout(index: number) {
   const z = Math.floor(r(5) * 10) + 1;
   const hasSeal = index % 3 === 0;
 
-  return { rotation, width, x, y, z, hasSeal };
+  return { rotation, width, photoH, x, y, z, hasSeal };
+}
+
+interface DragState {
+  id: string;
+  offsetX: number;
+  offsetY: number;
+  currentX: number;
+  currentY: number;
 }
 
 export function FavoritesModal({ onClose }: FavoritesModalProps) {
   const [favorites, setFavorites] = useState<Favorite[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const [uploading, setUploading] = useState(false);
   const [selectedImage, setSelectedImage] = useState<Favorite | null>(null);
+  const [drag, setDrag] = useState<DragState | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useWheelScroll<HTMLDivElement>();
+  const boardRef = useRef<HTMLDivElement>(null);
 
   const { authenticated: isAdmin } = useAdminStore();
 
   useEffect(() => {
+    setLoading(true);
+    setError(null);
     api.getFavorites().then((f) => {
       setFavorites(f);
       setLoading(false);
-    }).catch(() => setLoading(false));
-  }, []);
+    }).catch(() => {
+      setLoading(false);
+      setError("加载失败，请检查网络");
+    });
+  }, [retryCount]);
 
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -81,11 +123,82 @@ export function FavoritesModal({ onClose }: FavoritesModalProps) {
     }
   }
 
-  // Calculate board min-height based on last item position
+  // Drag handlers
+  const handleMouseDown = useCallback((e: React.MouseEvent, fav: Favorite) => {
+    if (!isAdmin || e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const board = boardRef.current;
+    if (!board) return;
+
+    const layout = noticeLayout(favorites.indexOf(fav), fav.width, fav.height);
+    const favX = fav.posX ?? layout.x;
+    const favY = fav.posY ?? layout.y;
+    const boardRect = board.getBoundingClientRect();
+    const scrollEl = scrollRef.current;
+
+    setDrag({
+      id: fav.id,
+      offsetX: e.clientX - boardRect.left - (scrollEl ? scrollEl.scrollLeft : 0) - favX,
+      offsetY: e.clientY - boardRect.top - (scrollEl ? scrollEl.scrollTop : 0) - favY,
+      currentX: favX,
+      currentY: favY,
+    });
+  }, [isAdmin, favorites, scrollRef]);
+
+  useEffect(() => {
+    if (!drag) return;
+
+    const board = boardRef.current;
+    if (!board) return;
+
+    function onMouseMove(e: MouseEvent) {
+      const boardRect = board!.getBoundingClientRect();
+      const scrollEl = scrollRef.current;
+      const newX = e.clientX - boardRect.left - (scrollEl ? scrollEl.scrollLeft : 0) - drag!.offsetX;
+      const newY = e.clientY - boardRect.top - (scrollEl ? scrollEl.scrollTop : 0) - drag!.offsetY;
+      setDrag((d) => d ? { ...d, currentX: Math.max(0, newX), currentY: Math.max(0, newY) } : null);
+    }
+
+    async function onMouseUp() {
+      const finalX = Math.round(drag!.currentX);
+      const finalY = Math.round(drag!.currentY);
+      const favId = drag!.id;
+      setDrag(null);
+
+      // Update local state immediately
+      setFavorites((prev) =>
+        prev.map((f) => f.id === favId ? { ...f, posX: finalX, posY: finalY } : f)
+      );
+
+      // Persist to server
+      try {
+        await api.updateFavoritePosition(favId, finalX, finalY);
+      } catch {
+        // ignore — position stays in local state
+      }
+    }
+
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+  }, [drag, scrollRef]);
+
+  // Calculate board min-height based on item positions
   const boardHeight = favorites.length > 0
     ? (() => {
-        const last = noticeLayout(favorites.length - 1);
-        return last.y + 360;
+        let maxY = 700;
+        favorites.forEach((fav, index) => {
+          const layout = noticeLayout(index, fav.width, fav.height);
+          const y = fav.posY ?? layout.y;
+          const h = layout.photoH;
+          maxY = Math.max(maxY, y + h + 160);
+        });
+        return maxY;
       })()
     : 700;
 
@@ -127,28 +240,45 @@ export function FavoritesModal({ onClose }: FavoritesModalProps) {
               <div className="switch-favorites-loading-bar" />
               <span>正在查阅委托...</span>
             </div>
+          ) : error ? (
+            <div className="switch-favorites-empty">
+              <span className="switch-favorites-empty-icon">⚠️</span>
+              <span>{error}</span>
+              <button
+                className="switch-favorites-upload-btn"
+                type="button"
+                onClick={() => setRetryCount((c) => c + 1)}
+              >
+                重试
+              </button>
+            </div>
           ) : favorites.length === 0 ? (
             <div className="switch-favorites-empty">
               <span className="switch-favorites-empty-icon">📋</span>
               <span>{isAdmin ? "点击「张贴委托」添加收藏" : "委托板空空如也"}</span>
             </div>
           ) : (
-            <div className="switch-favorites-board" style={{ minHeight: boardHeight }}>
+            <div ref={boardRef} className="switch-favorites-board" style={{ minHeight: boardHeight }}>
               {favorites.map((fav, index) => {
-                const layout = noticeLayout(index);
+                const layout = noticeLayout(index, fav.width, fav.height);
+                const isDragging = drag?.id === fav.id;
+                const x = isDragging ? drag!.currentX : (fav.posX ?? layout.x);
+                const y = isDragging ? drag!.currentY : (fav.posY ?? layout.y);
                 return (
                   <div
                     key={fav.id}
-                    className="switch-favorites-notice"
+                    className={`switch-favorites-notice${isDragging ? " is-dragging" : ""}${isAdmin ? " is-admin-draggable" : ""}`}
                     style={{
-                      left: `${layout.x}px`,
-                      top: `${layout.y}px`,
+                      left: `${x}px`,
+                      top: `${y}px`,
                       "--notice-w": `${layout.width}px`,
-                      "--notice-rot": `${layout.rotation}deg`,
-                      "--notice-z": layout.z,
-                      animationDelay: `${index * 0.08}s`,
+                      "--notice-rot": isDragging ? "0deg" : `${layout.rotation}deg`,
+                      "--notice-z": isDragging ? 9999 : layout.z,
+                      "--notice-photo-h": `${layout.photoH}px`,
+                      animationDelay: isDragging ? undefined : `${index * 0.08}s`,
                     } as React.CSSProperties}
-                    onClick={() => setSelectedImage(fav)}
+                    onClick={() => { if (!isDragging) setSelectedImage(fav); }}
+                    onMouseDown={(e) => handleMouseDown(e, fav)}
                   >
                     {/* Iron nail */}
                     <div className="switch-favorites-nail" />
@@ -162,7 +292,7 @@ export function FavoritesModal({ onClose }: FavoritesModalProps) {
                           alt={fav.title || `委托 ${index + 1}`}
                           draggable={false}
                         />
-                        {isAdmin && (
+                        {isAdmin && !isDragging && (
                           <button
                             className="switch-favorites-delete-btn"
                             type="button"
@@ -185,7 +315,7 @@ export function FavoritesModal({ onClose }: FavoritesModalProps) {
                       )}
 
                       {/* Wax seal */}
-                      {layout.hasSeal && <div className="switch-favorites-seal" />}
+                      {layout.hasSeal && !isDragging && <div className="switch-favorites-seal" />}
                     </div>
                   </div>
                 );

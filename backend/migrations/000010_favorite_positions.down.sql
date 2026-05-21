@@ -1,0 +1,2 @@
+ALTER TABLE favorites DROP COLUMN IF EXISTS pos_x;
+ALTER TABLE favorites DROP COLUMN IF EXISTS pos_y;

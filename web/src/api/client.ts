@@ -2,19 +2,28 @@ import type { APIResponse, AdminProfile, ProfileUpdate, Project, ProjectCreate, 
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? "/api/v1";
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function request<T>(path: string, init?: RequestInit, retries = 2): Promise<T> {
   const isFormData = init?.body instanceof FormData;
   const headers: Record<string, string> = isFormData
     ? { ...init?.headers as Record<string, string> }
     : { "Content-Type": "application/json", ...init?.headers as Record<string, string> };
-  const res = await fetch(`${BASE_URL}${path}`, {
-    credentials: "include",
-    ...init,
-    headers,
-  });
-  const json: APIResponse<T> = await res.json();
-  if (json.error) throw new Error(json.error.message);
-  return json.data;
+
+  for (let i = 0; i <= retries; i++) {
+    try {
+      const res = await fetch(`${BASE_URL}${path}`, {
+        credentials: "include",
+        ...init,
+        headers,
+      });
+      const json: APIResponse<T> = await res.json();
+      if (json.error) throw new Error(json.error.message);
+      return json.data;
+    } catch (err) {
+      if (i === retries) throw err;
+      await new Promise((r) => setTimeout(r, 1000 * (i + 1)));
+    }
+  }
+  throw new Error("unreachable");
 }
 
 export const api = {
@@ -30,6 +39,7 @@ export const api = {
   logout: () => request<{ loggedOut: boolean }>("/admin/logout", { method: "POST" }),
 
   // Profile
+  getPublicProfile: () => request<AdminProfile>("/profile"),
   getProfile: () => request<AdminProfile>("/admin/profile"),
   updateProfile: (data: ProfileUpdate) =>
     request<AdminProfile>("/admin/profile", {
@@ -74,6 +84,11 @@ export const api = {
     }),
   deleteProject: (id: string) =>
     request<void>(`/admin/projects/${id}`, { method: "DELETE" }),
+  reorderProjects: (ids: string[]) =>
+    request<void>("/admin/projects/reorder", {
+      method: "PUT",
+      body: JSON.stringify({ ids }),
+    }),
   uploadProjectIcon: (id: string, file: File) => {
     const form = new FormData();
     form.append("file", file);
@@ -175,4 +190,9 @@ export const api = {
   },
   deleteFavorite: (id: string) =>
     request<void>(`/admin/favorites/${id}`, { method: "DELETE" }),
+  updateFavoritePosition: (id: string, posX: number | null, posY: number | null) =>
+    request<void>(`/admin/favorites/${id}/position`, {
+      method: "PATCH",
+      body: JSON.stringify({ posX, posY }),
+    }),
 };

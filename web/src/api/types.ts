@@ -53,6 +53,7 @@ export interface Project {
   status: string;
   techStack: string[];
   pinned: boolean;
+  sortOrder: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -213,6 +214,10 @@ export interface Favorite {
   title: string;
   description: string;
   imageUrl: string;
+  width: number;
+  height: number;
+  posX: number | null;
+  posY: number | null;
   sortOrder: number;
   createdAt: string;
 }

@@ -388,7 +388,7 @@ function ProjectManager({ onSave }: { onSave: (p: Project[]) => void }) {
             style={{ background: p.accentColor || "#24c9f4" }}
           >
             {p.iconUrl ? (
-              <img src={p.iconUrl} alt="" />
+              <img src={p.iconUrl} alt="" loading="lazy" />
             ) : (
               <span>{p.name.charAt(0)}</span>
             )}

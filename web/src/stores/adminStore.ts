@@ -38,5 +38,5 @@ export const useAdminStore = create<AdminStore>((set) => ({
   setProjects: (rawProjects) =>
     set({ rawProjects, projects: rawProjects.map(mapBackendProject) }),
   logout: () =>
-    set({ authenticated: false, profile: null, projects: [], rawProjects: [] }),
+    set({ authenticated: false }),
 }));

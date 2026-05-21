@@ -1,13 +1,15 @@
 import { create } from "zustand";
 
 interface SceneStore {
-  isLoading: boolean;
-  layoutLoaded: boolean;
-  setLayoutLoaded: (loaded: boolean) => void;
+  totalModels: number;
+  loadedModels: number;
+  registerModel: () => void;
+  modelLoaded: () => void;
 }
 
 export const useSceneStore = create<SceneStore>((set) => ({
-  isLoading: true,
-  layoutLoaded: false,
-  setLayoutLoaded: (loaded) => set({ layoutLoaded: loaded, isLoading: false }),
+  totalModels: 0,
+  loadedModels: 0,
+  registerModel: () => set((s) => ({ totalModels: s.totalModels + 1 })),
+  modelLoaded: () => set((s) => ({ loadedModels: s.loadedModels + 1 })),
 }));

@@ -5,6 +5,7 @@ import * as THREE from "three";
 import { NightStage } from "./NightStage";
 import { SceneLoader } from "./SceneLoader";
 import { useSceneLayout } from "./useSceneLayout";
+import { LoadingOverlay } from "./LoadingOverlay";
 
 const DESKTOP_FOV = 42;
 const MOBILE_FOV = 58;
@@ -94,7 +95,6 @@ export function SceneEntry() {
   const { layout } = useSceneLayout();
   const [screenFocused, setScreenFocused] = useState(false);
   const [screenResetSignal, setScreenResetSignal] = useState(0);
-
   function openScreen() {
     setScreenFocused(true);
   }
@@ -117,6 +117,7 @@ export function SceneEntry() {
 
   return (
     <div className="w-full h-full relative">
+      <LoadingOverlay />
       <Canvas
         shadows
         camera={{ fov: DESKTOP_FOV, near: 0.1, far: 240, position: cameraPos }}

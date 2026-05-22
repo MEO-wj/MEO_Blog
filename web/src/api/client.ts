@@ -51,7 +51,17 @@ function refreshCacheTimestamp(key: string): void {
 }
 
 export function invalidateCache(path: string): void {
-  localStorage.removeItem(`cache:${path}`);
+  const prefix = `cache:${path}`;
+  localStorage.removeItem(prefix);
+  // Also remove entries with query params (e.g. /blog/posts clears /blog/posts?category=x)
+  const keysToRemove: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith(prefix) && key !== prefix) {
+      keysToRemove.push(key);
+    }
+  }
+  for (const key of keysToRemove) localStorage.removeItem(key);
 }
 
 /** Synchronous cache read for store initialization only (no background fetch).
@@ -164,39 +174,42 @@ export const api = {
   // Profile
   getPublicProfile: () => request<AdminProfile>("/profile", undefined, 2, 10 * 60 * 1000),
   getProfile: () => request<AdminProfile>("/admin/profile", undefined, 2, 5 * 60 * 1000),
-  updateProfile: (data: ProfileUpdate) => {
-    invalidateCache("GET:/profile");
-    invalidateCache("GET:/admin/profile");
-    return request<AdminProfile>("/admin/profile", {
+  updateProfile: async (data: ProfileUpdate) => {
+    const result = await request<AdminProfile>("/admin/profile", {
       method: "PUT",
       body: JSON.stringify(data),
     });
-  },
-  uploadAvatar: (file: File) => {
     invalidateCache("GET:/profile");
     invalidateCache("GET:/admin/profile");
+    return result;
+  },
+  uploadAvatar: async (file: File) => {
     const form = new FormData();
     form.append("file", file);
-    return request<{ url: string }>("/admin/avatar", {
+    const result = await request<{ url: string }>("/admin/avatar", {
       method: "POST",
       body: form,
       headers: {},
     });
+    invalidateCache("GET:/profile");
+    invalidateCache("GET:/admin/profile");
+    return result;
   },
 
   // Resume
   getResume: () => request<{ url: string }>("/resume", undefined, 2, 30 * 60 * 1000),
-  uploadResume: (file: File) => {
-    invalidateCache("GET:/resume");
-    invalidateCache("GET:/profile");
-    invalidateCache("GET:/admin/profile");
+  uploadResume: async (file: File) => {
     const form = new FormData();
     form.append("file", file);
-    return request<{ url: string }>("/admin/resume", {
+    const result = await request<{ url: string }>("/admin/resume", {
       method: "POST",
       body: form,
       headers: {},
     });
+    invalidateCache("GET:/resume");
+    invalidateCache("GET:/profile");
+    invalidateCache("GET:/admin/profile");
+    return result;
   },
 
   // Projects (public)
@@ -205,45 +218,43 @@ export const api = {
   getProjectDetail: (slug: string) => request<Project>(`/projects/${slug}`, undefined, 2, 5 * 60 * 1000),
 
   // Projects (admin)
-  createProject: (data: ProjectCreate) => {
-    invalidateCache("GET:/projects");
-    invalidateCache("GET:/projects?fields=summary");
-    return request<Project>("/admin/projects", {
+  createProject: async (data: ProjectCreate) => {
+    const result = await request<Project>("/admin/projects", {
       method: "POST",
       body: JSON.stringify(data),
     });
-  },
-  updateProject: (id: string, data: ProjectUpdate) => {
     invalidateCache("GET:/projects");
-    invalidateCache("GET:/projects?fields=summary");
-    return request<Project>(`/admin/projects/${id}`, {
+    return result;
+  },
+  updateProject: async (id: string, data: ProjectUpdate) => {
+    const result = await request<Project>(`/admin/projects/${id}`, {
       method: "PUT",
       body: JSON.stringify(data),
     });
-  },
-  deleteProject: (id: string) => {
     invalidateCache("GET:/projects");
-    invalidateCache("GET:/projects?fields=summary");
-    return request<void>(`/admin/projects/${id}`, { method: "DELETE" });
+    return result;
   },
-  reorderProjects: (ids: string[]) => {
+  deleteProject: async (id: string) => {
+    await request<void>(`/admin/projects/${id}`, { method: "DELETE" });
     invalidateCache("GET:/projects");
-    invalidateCache("GET:/projects?fields=summary");
-    return request<void>("/admin/projects/reorder", {
+  },
+  reorderProjects: async (ids: string[]) => {
+    await request<void>("/admin/projects/reorder", {
       method: "PUT",
       body: JSON.stringify({ ids }),
     });
-  },
-  uploadProjectIcon: (id: string, file: File) => {
     invalidateCache("GET:/projects");
-    invalidateCache("GET:/projects?fields=summary");
+  },
+  uploadProjectIcon: async (id: string, file: File) => {
     const form = new FormData();
     form.append("file", file);
-    return request<{ url: string }>(`/admin/projects/${id}/icon`, {
+    const result = await request<{ url: string }>(`/admin/projects/${id}/icon`, {
       method: "POST",
       body: form,
       headers: {},
     });
+    invalidateCache("GET:/projects");
+    return result;
   },
 
   // GitHub (public, proxied through backend)
@@ -258,129 +269,138 @@ export const api = {
     request<BlogPost[]>(`/blog/posts${categorySlug ? `?category=${categorySlug}` : ""}`, undefined, 2, 5 * 60 * 1000),
   getBlogPost: (id: string) => request<BlogPost>(`/blog/posts/${id}`, undefined, 2, 10 * 60 * 1000),
   getBlogComments: (postId: string) => request<BlogComment[]>(`/blog/posts/${postId}/comments`, undefined, 2, 2 * 60 * 1000),
-  createBlogComment: (postId: string, data: BlogCommentCreate) => {
-    invalidateCache(`GET:/blog/posts/${postId}/comments`);
-    return request<BlogComment>(`/blog/posts/${postId}/comments`, {
+  createBlogComment: async (postId: string, data: BlogCommentCreate) => {
+    const result = await request<BlogComment>(`/blog/posts/${postId}/comments`, {
       method: "POST",
       body: JSON.stringify(data),
     });
+    invalidateCache(`GET:/blog/posts/${postId}/comments`);
+    return result;
   },
 
   // Blog (admin)
   adminGetBlogPosts: (categorySlug?: string) =>
     request<BlogPost[]>(`/admin/blog/posts${categorySlug ? `?category=${categorySlug}` : ""}`, undefined, 2, 5 * 60 * 1000),
-  createBlogCategory: (data: BlogCategoryCreate) => {
-    invalidateCache("GET:/blog/categories");
-    return request<BlogCategory>("/admin/blog/categories", {
+  createBlogCategory: async (data: BlogCategoryCreate) => {
+    const result = await request<BlogCategory>("/admin/blog/categories", {
       method: "POST",
       body: JSON.stringify(data),
     });
-  },
-  updateBlogCategory: (id: string, data: Partial<BlogCategoryCreate>) => {
     invalidateCache("GET:/blog/categories");
-    return request<BlogCategory>(`/admin/blog/categories/${id}`, {
+    return result;
+  },
+  updateBlogCategory: async (id: string, data: Partial<BlogCategoryCreate>) => {
+    const result = await request<BlogCategory>(`/admin/blog/categories/${id}`, {
       method: "PUT",
       body: JSON.stringify(data),
     });
-  },
-  deleteBlogCategory: (id: string) => {
     invalidateCache("GET:/blog/categories");
-    return request<void>(`/admin/blog/categories/${id}`, { method: "DELETE" });
+    return result;
   },
-  createBlogPost: (data: BlogPostCreate) => {
-    invalidateCache("GET:/blog/posts");
+  deleteBlogCategory: async (id: string) => {
+    await request<void>(`/admin/blog/categories/${id}`, { method: "DELETE" });
     invalidateCache("GET:/blog/categories");
-    invalidateCache("GET:/admin/blog/posts");
-    return request<BlogPost>("/admin/blog/posts", {
+  },
+  createBlogPost: async (data: BlogPostCreate) => {
+    const result = await request<BlogPost>("/admin/blog/posts", {
       method: "POST",
       body: JSON.stringify(data),
     });
+    invalidateCache("GET:/blog/posts");
+    invalidateCache("GET:/blog/categories");
+    invalidateCache("GET:/admin/blog/posts");
+    return result;
   },
-  updateBlogPost: (id: string, data: BlogPostUpdate) => {
+  updateBlogPost: async (id: string, data: BlogPostUpdate) => {
+    const result = await request<BlogPost>(`/admin/blog/posts/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
     invalidateCache("GET:/blog/posts");
     invalidateCache("GET:/blog/categories");
     invalidateCache("GET:/admin/blog/posts");
     invalidateCache(`GET:/blog/posts/${id}`);
-    return request<BlogPost>(`/admin/blog/posts/${id}`, {
-      method: "PUT",
-      body: JSON.stringify(data),
-    });
+    return result;
   },
-  deleteBlogPost: (id: string) => {
+  deleteBlogPost: async (id: string) => {
+    await request<void>(`/admin/blog/posts/${id}`, { method: "DELETE" });
     invalidateCache("GET:/blog/posts");
     invalidateCache("GET:/blog/categories");
     invalidateCache("GET:/admin/blog/posts");
     invalidateCache(`GET:/blog/posts/${id}`);
-    return request<void>(`/admin/blog/posts/${id}`, { method: "DELETE" });
   },
-  deleteBlogComment: (postId: string, commentId: string) => {
+  deleteBlogComment: async (postId: string, commentId: string) => {
+    await request<void>(`/admin/blog/comments/${commentId}`, { method: "DELETE" });
     invalidateCache(`GET:/blog/posts/${postId}/comments`);
-    return request<void>(`/admin/blog/comments/${commentId}`, { method: "DELETE" });
   },
 
   // Guestbook (public)
   getGuestbookMessages: () => request<GuestbookMessage[]>("/guestbook/messages", undefined, 2, 60 * 1000),
-  createGuestbookMessage: (data: GuestbookMessageCreate) => {
-    invalidateCache("GET:/guestbook/messages");
-    return request<GuestbookMessage>("/guestbook/messages", {
+  createGuestbookMessage: async (data: GuestbookMessageCreate) => {
+    const result = await request<GuestbookMessage>("/guestbook/messages", {
       method: "POST",
       body: JSON.stringify(data),
     });
-  },
-  replyToGuestbookAsUser: (id: string, data: { nickname: string; content: string }) => {
     invalidateCache("GET:/guestbook/messages");
-    return request<GuestbookMessage>(`/guestbook/messages/${id}/replies`, {
+    return result;
+  },
+  replyToGuestbookAsUser: async (id: string, data: { nickname: string; content: string }) => {
+    const result = await request<GuestbookMessage>(`/guestbook/messages/${id}/replies`, {
       method: "POST",
       body: JSON.stringify(data),
     });
-  },
-  deleteOwnGuestbookMessage: (id: string) => {
     invalidateCache("GET:/guestbook/messages");
-    return request<void>(`/guestbook/messages/${id}`, { method: "DELETE" });
+    return result;
+  },
+  deleteOwnGuestbookMessage: async (id: string) => {
+    await request<void>(`/guestbook/messages/${id}`, { method: "DELETE" });
+    invalidateCache("GET:/guestbook/messages");
   },
 
   // Guestbook (admin)
-  replyToGuestbookMessage: (id: string, data: GuestbookReplyCreate) => {
-    invalidateCache("GET:/guestbook/messages");
-    return request<GuestbookMessage>(`/admin/guestbook/messages/${id}/replies`, {
+  replyToGuestbookMessage: async (id: string, data: GuestbookReplyCreate) => {
+    const result = await request<GuestbookMessage>(`/admin/guestbook/messages/${id}/replies`, {
       method: "POST",
       body: JSON.stringify(data),
     });
-  },
-  deleteGuestbookMessage: (id: string) => {
     invalidateCache("GET:/guestbook/messages");
-    return request<void>(`/admin/guestbook/messages/${id}`, { method: "DELETE" });
+    return result;
   },
-  deleteGuestbookReply: (id: string) => {
+  deleteGuestbookMessage: async (id: string) => {
+    await request<void>(`/admin/guestbook/messages/${id}`, { method: "DELETE" });
     invalidateCache("GET:/guestbook/messages");
-    return request<void>(`/admin/guestbook/replies/${id}`, { method: "DELETE" });
+  },
+  deleteGuestbookReply: async (id: string) => {
+    await request<void>(`/admin/guestbook/replies/${id}`, { method: "DELETE" });
+    invalidateCache("GET:/guestbook/messages");
   },
 
   // Favorites (public)
   getFavorites: () => request<Favorite[]>("/favorites", undefined, 2, 5 * 60 * 1000),
 
   // Favorites (admin)
-  createFavorite: (file: File, title?: string, description?: string) => {
-    invalidateCache("GET:/favorites");
+  createFavorite: async (file: File, title?: string, description?: string) => {
     const form = new FormData();
     form.append("file", file);
     if (title) form.append("title", title);
     if (description) form.append("description", description);
-    return request<Favorite>("/admin/favorites", {
+    const result = await request<Favorite>("/admin/favorites", {
       method: "POST",
       body: form,
       headers: {},
     });
-  },
-  deleteFavorite: (id: string) => {
     invalidateCache("GET:/favorites");
-    return request<void>(`/admin/favorites/${id}`, { method: "DELETE" });
+    return result;
   },
-  updateFavoritePosition: (id: string, posX: number | null, posY: number | null) => {
+  deleteFavorite: async (id: string) => {
+    await request<void>(`/admin/favorites/${id}`, { method: "DELETE" });
     invalidateCache("GET:/favorites");
-    return request<void>(`/admin/favorites/${id}/position`, {
+  },
+  updateFavoritePosition: async (id: string, posX: number | null, posY: number | null) => {
+    await request<void>(`/admin/favorites/${id}/position`, {
       method: "PATCH",
       body: JSON.stringify({ posX, posY }),
     });
+    invalidateCache("GET:/favorites");
   },
 };

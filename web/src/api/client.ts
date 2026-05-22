@@ -22,14 +22,11 @@ function getCacheEntry(key: string): CacheEntry | null {
   }
 }
 
-function getCache(key: string, ttlMs: number): { data: unknown; etag?: string } | null {
+function getCache(key: string, ttlMs: number): { data: unknown; etag?: string; stale: boolean } | null {
   const entry = getCacheEntry(key);
   if (!entry) return null;
-  if (Date.now() - entry.timestamp > ttlMs) {
-    localStorage.removeItem(`cache:${key}`);
-    return null;
-  }
-  return { data: entry.data, etag: entry.etag };
+  const stale = Date.now() - entry.timestamp > ttlMs;
+  return { data: entry.data, etag: entry.etag, stale };
 }
 
 function setCache(key: string, data: unknown, etag?: string): void {
@@ -81,7 +78,7 @@ async function request<T>(path: string, init?: RequestInit, retries = 2, cacheMs
   const method = (init?.method ?? "GET").toUpperCase();
   const cacheKey = `${method}:${path}`;
 
-  // Return from cache immediately if valid (stale-while-revalidate)
+  // Return from cache immediately + background refresh (stale-while-revalidate)
   if (cacheMs && method === "GET") {
     const cached = getCache(cacheKey, cacheMs);
     if (cached !== null) {

@@ -77,7 +77,8 @@ func ListGuestbookMessages(ctx context.Context, db *pgxpool.Pool, clientIP strin
 		`SELECT `+guestbookSelectCols+`, coalesce(cast(ip_address as text),'')
 		 FROM guestbook_messages
 		 WHERE parent_id IS NULL
-		 ORDER BY created_at DESC`,
+		 ORDER BY created_at DESC
+		 LIMIT 100`,
 	)
 	if err != nil {
 		return nil, err
@@ -105,7 +106,8 @@ func ListGuestbookMessages(ctx context.Context, db *pgxpool.Pool, clientIP strin
 		`SELECT `+guestbookSelectCols+`, coalesce(cast(ip_address as text),'')
 		 FROM guestbook_messages
 		 WHERE parent_id IS NOT NULL
-		 ORDER BY created_at ASC`,
+		 ORDER BY created_at ASC
+		 LIMIT 500`,
 	)
 	if err != nil {
 		return nil, err

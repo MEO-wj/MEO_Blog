@@ -4,22 +4,57 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sync"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type etagFn func(ctx context.Context, db *pgxpool.Pool) (string, error)
 
+// etagCacheEntry holds a cached ETag value with expiry.
+type etagCacheEntry struct {
+	etag    string
+	expires time.Time
+}
+
+var (
+	etagCache   = make(map[string]*etagCacheEntry)
+	etagCacheMu sync.RWMutex
+)
+
+const etagCacheTTL = 5 * time.Second
+
+func getCachedETag(key string) (string, bool) {
+	etagCacheMu.RLock()
+	defer etagCacheMu.RUnlock()
+	if e, ok := etagCache[key]; ok && time.Now().Before(e.expires) {
+		return e.etag, true
+	}
+	return "", false
+}
+
+func setCachedETag(key, etag string) {
+	etagCacheMu.Lock()
+	defer etagCacheMu.Unlock()
+	etagCache[key] = &etagCacheEntry{etag: etag, expires: time.Now().Add(etagCacheTTL)}
+}
+
 // ETagMiddleware computes an ETag from the provided function and returns 304
-// when the client's If-None-Match header matches.
-func ETagMiddleware(fn etagFn, db *pgxpool.Pool) func(http.Handler) http.Handler {
+// when the client's If-None-Match header matches. Results are cached for a
+// few seconds to avoid hitting the database on every request.
+func ETagMiddleware(fn etagFn, db *pgxpool.Pool, cacheKey string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			etag, err := fn(r.Context(), db)
-			if err != nil {
-				// If ETag computation fails, just serve normally
-				next.ServeHTTP(w, r)
-				return
+			etag, ok := getCachedETag(cacheKey)
+			if !ok {
+				var err error
+				etag, err = fn(r.Context(), db)
+				if err != nil {
+					next.ServeHTTP(w, r)
+					return
+				}
+				setCachedETag(cacheKey, etag)
 			}
 
 			w.Header().Set("ETag", etag)
@@ -121,4 +156,11 @@ func computeResumeETag(ctx context.Context, db *pgxpool.Pool) (string, error) {
 		return "", err
 	}
 	return fmt.Sprintf(`W/"resume-%d"`, ts), nil
+}
+
+// InvalidateETagCache forces re-computation of a specific ETag on next request.
+func InvalidateETagCache(key string) {
+	etagCacheMu.Lock()
+	defer etagCacheMu.Unlock()
+	delete(etagCache, key)
 }

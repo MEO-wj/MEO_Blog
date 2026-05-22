@@ -47,7 +47,7 @@ func listBlogPostsHandler(db *pgxpool.Pool) http.HandlerFunc {
 		posts, err := repository.ListBlogPosts(r.Context(), db, categoryID, false)
 		if err != nil {
 			slog.Error("list blog posts failed", "error", err, "categoryID", categoryID)
-			RespondError(w, "LIST_FAILED", "failed to list posts: "+err.Error(), http.StatusInternalServerError)
+			RespondError(w, "LIST_FAILED", "failed to list posts", http.StatusInternalServerError)
 			return
 		}
 		RespondOK(w, posts)
@@ -81,6 +81,7 @@ func listBlogCommentsHandler(db *pgxpool.Pool) http.HandlerFunc {
 func createBlogCommentHandler(db *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		postID := chi.URLParam(r, "id")
+		r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
 		var c repository.BlogCommentCreate
 		if err := json.NewDecoder(r.Body).Decode(&c); err != nil {
 			RespondError(w, "INVALID_JSON", "invalid request body", http.StatusBadRequest)
@@ -89,6 +90,14 @@ func createBlogCommentHandler(db *pgxpool.Pool) http.HandlerFunc {
 		c.PostID = postID
 		if c.AuthorName == "" || c.Content == "" {
 			RespondError(w, "VALIDATION_ERROR", "author name and content are required", http.StatusBadRequest)
+			return
+		}
+		if len(c.AuthorName) > 50 {
+			RespondError(w, "VALIDATION_ERROR", "author name too long (max 50)", http.StatusBadRequest)
+			return
+		}
+		if len(c.Content) > 2000 {
+			RespondError(w, "VALIDATION_ERROR", "content too long (max 2000)", http.StatusBadRequest)
 			return
 		}
 		comment, err := repository.CreateBlogComment(r.Context(), db, &c)
@@ -104,6 +113,7 @@ func createBlogCommentHandler(db *pgxpool.Pool) http.HandlerFunc {
 
 func adminCreateBlogCategoryHandler(db *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, 16<<10)
 		var c repository.BlogCategoryCreate
 		if err := json.NewDecoder(r.Body).Decode(&c); err != nil {
 			RespondError(w, "INVALID_JSON", "invalid request body", http.StatusBadRequest)
@@ -113,9 +123,14 @@ func adminCreateBlogCategoryHandler(db *pgxpool.Pool) http.HandlerFunc {
 			RespondError(w, "VALIDATION_ERROR", "name and slug are required", http.StatusBadRequest)
 			return
 		}
+		if !isValidSlug(c.Slug) {
+			RespondError(w, "VALIDATION_ERROR", "slug must be lowercase alphanumeric with hyphens", http.StatusBadRequest)
+			return
+		}
 		category, err := repository.CreateBlogCategory(r.Context(), db, &c)
 		if err != nil {
-			RespondError(w, "CREATE_FAILED", "failed to create category: "+err.Error(), http.StatusInternalServerError)
+			slog.Error("create blog category failed", "error", err)
+			RespondError(w, "CREATE_FAILED", "failed to create category", http.StatusInternalServerError)
 			return
 		}
 		RespondOK(w, category)
@@ -125,9 +140,14 @@ func adminCreateBlogCategoryHandler(db *pgxpool.Pool) http.HandlerFunc {
 func adminUpdateBlogCategoryHandler(db *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
+		r.Body = http.MaxBytesReader(w, r.Body, 16<<10)
 		var u repository.BlogCategoryUpdate
 		if err := json.NewDecoder(r.Body).Decode(&u); err != nil {
 			RespondError(w, "INVALID_JSON", "invalid request body", http.StatusBadRequest)
+			return
+		}
+		if u.Slug != nil && !isValidSlug(*u.Slug) {
+			RespondError(w, "VALIDATION_ERROR", "slug must be lowercase alphanumeric with hyphens", http.StatusBadRequest)
 			return
 		}
 		category, err := repository.UpdateBlogCategory(r.Context(), db, id, &u)
@@ -152,6 +172,7 @@ func adminDeleteBlogCategoryHandler(db *pgxpool.Pool) http.HandlerFunc {
 
 func adminCreateBlogPostHandler(db *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 		var c repository.BlogPostCreate
 		if err := json.NewDecoder(r.Body).Decode(&c); err != nil {
 			RespondError(w, "INVALID_JSON", "invalid request body", http.StatusBadRequest)
@@ -161,9 +182,14 @@ func adminCreateBlogPostHandler(db *pgxpool.Pool) http.HandlerFunc {
 			RespondError(w, "VALIDATION_ERROR", "title and slug are required", http.StatusBadRequest)
 			return
 		}
+		if !isValidSlug(c.Slug) {
+			RespondError(w, "VALIDATION_ERROR", "slug must be lowercase alphanumeric with hyphens", http.StatusBadRequest)
+			return
+		}
 		post, err := repository.CreateBlogPost(r.Context(), db, &c)
 		if err != nil {
-			RespondError(w, "CREATE_FAILED", "failed to create post: "+err.Error(), http.StatusInternalServerError)
+			slog.Error("create blog post failed", "error", err)
+			RespondError(w, "CREATE_FAILED", "failed to create post", http.StatusInternalServerError)
 			return
 		}
 		RespondOK(w, post)
@@ -173,9 +199,14 @@ func adminCreateBlogPostHandler(db *pgxpool.Pool) http.HandlerFunc {
 func adminUpdateBlogPostHandler(db *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
+		r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 		var u repository.BlogPostUpdate
 		if err := json.NewDecoder(r.Body).Decode(&u); err != nil {
 			RespondError(w, "INVALID_JSON", "invalid request body", http.StatusBadRequest)
+			return
+		}
+		if u.Slug != nil && !isValidSlug(*u.Slug) {
+			RespondError(w, "VALIDATION_ERROR", "slug must be lowercase alphanumeric with hyphens", http.StatusBadRequest)
 			return
 		}
 		post, err := repository.UpdateBlogPost(r.Context(), db, id, &u)
@@ -219,7 +250,7 @@ func adminListBlogPostsHandler(db *pgxpool.Pool) http.HandlerFunc {
 		posts, err := repository.ListBlogPosts(r.Context(), db, categoryID, true)
 		if err != nil {
 			slog.Error("admin list blog posts failed", "error", err, "categoryID", categoryID)
-			RespondError(w, "LIST_FAILED", "failed to list posts: "+err.Error(), http.StatusInternalServerError)
+			RespondError(w, "LIST_FAILED", "failed to list posts", http.StatusInternalServerError)
 			return
 		}
 		RespondOK(w, posts)

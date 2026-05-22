@@ -4,28 +4,30 @@ import { useSceneStore } from "../stores/sceneStore";
 export function LoadingOverlay() {
   const totalModels = useSceneStore((s) => s.totalModels);
   const loadedModels = useSceneStore((s) => s.loadedModels);
+  const iconsReady = useSceneStore((s) => s.iconsReady);
   const [done, setDone] = useState(false);
   const minTimerDone = useRef(false);
-  const allLoadedRef = useRef(false);
+  const readyRef = useRef(false);
 
   const allLoaded = totalModels > 0 && loadedModels >= totalModels;
+  const ready = iconsReady || allLoaded;
   const progress = totalModels > 0 ? Math.min(100, Math.round((loadedModels / totalModels) * 100)) : 0;
 
-  allLoadedRef.current = allLoaded;
+  readyRef.current = ready;
 
   // Min 1.5s display
   useEffect(() => {
     const t = setTimeout(() => {
       minTimerDone.current = true;
-      if (allLoadedRef.current) setDone(true);
+      if (readyRef.current) setDone(true);
     }, 1500);
     return () => clearTimeout(t);
   }, []);
 
-  // When models done (after min timer)
+  // Fade when icons ready or models done (after min timer)
   useEffect(() => {
-    if (allLoaded && minTimerDone.current) setDone(true);
-  }, [allLoaded]);
+    if (ready && minTimerDone.current) setDone(true);
+  }, [ready]);
 
   const statusText = done
     ? "准备就绪"

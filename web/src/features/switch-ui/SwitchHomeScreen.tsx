@@ -24,6 +24,7 @@ import { FavoritesModal } from "./FavoritesModal";
 import { SaveToast } from "./SaveToast";
 import { api } from "../../api/client";
 import { useAdminStore } from "../../stores/adminStore";
+import { useSceneStore } from "../../stores/sceneStore";
 import { useSound } from "./useSound";
 import type { Project } from "../../api/types";
 import "./switch-ui.css";
@@ -427,6 +428,29 @@ export function SwitchHomeScreen({
       ),
     ];
   }, [storeProjects]);
+
+  // Preload project icons so they're visible before 3D models finish loading
+  const setIconsReady = useSceneStore((s) => s.setIconsReady);
+  useEffect(() => {
+    const iconUrls = projectItems
+      .map((p) => p.iconUrl)
+      .filter((u): u is string => !!u);
+    if (iconUrls.length === 0) {
+      setIconsReady();
+      return;
+    }
+    let cancelled = false;
+    let loaded = 0;
+    for (const url of iconUrls) {
+      const img = new Image();
+      img.onload = img.onerror = () => {
+        loaded++;
+        if (!cancelled && loaded >= iconUrls.length) setIconsReady();
+      };
+      img.src = url;
+    }
+    return () => { cancelled = true; };
+  }, [projectItems, setIconsReady]);
 
   const currentProject = projectItems[selectedProject] ?? projectItems[0];
   const currentAction = switchHomeActions[selectedAction] ?? switchHomeActions[0];

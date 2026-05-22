@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import Markdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import type { Project } from "../../api/types";
 import type { SwitchHomeProject } from "./switchHomeData";
 import { useWheelScroll } from "./useWheelScroll";
@@ -89,7 +90,7 @@ export function ProjectDetail({ project, onClose }: ProjectDetailProps) {
               <h3 className="project-detail-subtitle">项目简介</h3>
               <hr className="project-detail-divider" />
               <div className="project-detail-desc blog-markdown">
-                <Markdown>{description}</Markdown>
+                <Markdown remarkPlugins={[remarkGfm]}>{description}</Markdown>
               </div>
             </>
           )}

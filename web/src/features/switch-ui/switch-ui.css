@@ -2421,6 +2421,26 @@
   padding-left: 1.5em;
   margin: 0.5em 0;
 }
+.project-detail-desc.blog-markdown table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.8em 0;
+  font-size: 13px;
+}
+.project-detail-desc.blog-markdown th,
+.project-detail-desc.blog-markdown td {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 6px 10px;
+  text-align: left;
+}
+.project-detail-desc.blog-markdown th {
+  background: rgba(0, 0, 0, 0.3);
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+}
+.project-detail-desc.blog-markdown tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.03);
+}
 
 .project-detail-desc::-webkit-scrollbar {
   width: 5px;
@@ -3177,6 +3197,26 @@
 .blog-markdown img {
   max-width: 100%;
   border-radius: 8px;
+}
+.blog-markdown table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1em 0;
+  font-size: 14px;
+}
+.blog-markdown th,
+.blog-markdown td {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 8px 12px;
+  text-align: left;
+}
+.blog-markdown th {
+  background: rgba(0, 0, 0, 0.3);
+  font-weight: 600;
+  color: rgba(240, 230, 210, 0.95);
+}
+.blog-markdown tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.03);
 }
 
 /* Comments */

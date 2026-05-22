@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import Markdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { api } from "../../api/client";
 import type { BlogCategory, BlogCategoryCreate, BlogPost, BlogPostCreate, BlogComment } from "../../api/types";
 import { useAdminStore } from "../../stores/adminStore";
@@ -501,7 +502,7 @@ function ReaderView({
             {post.publishedAt && <span>发布于 {formatDate(post.publishedAt)}</span>}
           </div>
           <div className="blog-markdown">
-            <Markdown>{post.contentMd}</Markdown>
+            <Markdown remarkPlugins={[remarkGfm]}>{post.contentMd}</Markdown>
           </div>
         </div>
         <div className="blog-scroll-ornament-bottom" />

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { api } from "../../api/client";
+import { saveQueue } from "../../api/saveQueue";
 import type { AdminProfile, Project, ProjectCreate, ProjectSummary, ProjectUpdate } from "../../api/types";
 import { useAdminStore } from "../../stores/adminStore";
 import { useWheelScroll } from "./useWheelScroll";
@@ -323,13 +324,37 @@ function ProjectManager({ onSave }: { onSave: (p: ProjectSummary[]) => void }) {
     // Full detail loaded inside ProjectForm
   }
 
-  function handleSaved(_project: Project) {
-    api.getProjectSummaries().then((p) => {
-      setProjects(p);
-      onSave(p);
-    }).catch(() => {});
+  function handleSaved(project: Project) {
+    // Optimistic update: immediately reflect in local state
+    const optimisticSummary: ProjectSummary = {
+      id: project.id,
+      name: project.name,
+      slug: project.slug,
+      coverUrl: project.coverUrl ?? "",
+      iconUrl: project.iconUrl ?? "",
+      accentColor: project.accentColor ?? "",
+      category: project.category ?? "",
+      status: project.status ?? "",
+      pinned: project.pinned ?? false,
+      sortOrder: project.sortOrder ?? 0,
+      createdAt: project.createdAt ?? "",
+      updatedAt: project.updatedAt ?? new Date().toISOString(),
+    };
+    const exists = projects.some((p) => p.id === project.id);
+    const updated = exists
+      ? projects.map((p) => (p.id === project.id ? optimisticSummary : p))
+      : [...projects, optimisticSummary];
+    setProjects(updated);
+    onSave(updated);
     setEditing(null);
     setCreating(false);
+    // Background: re-fetch real data after save completes
+    setTimeout(() => {
+      api.getProjectSummaries().then((p) => {
+        setProjects(p);
+        onSave(p);
+      }).catch(() => {});
+    }, 1500);
   }
 
   const handleDragStart = useCallback((idx: number) => {
@@ -513,37 +538,53 @@ function ProjectForm({
     ev.preventDefault();
     if (!form.name) return;
     setSaving(true);
-    try {
-      let saved: Project;
-      if (project) {
-        // Only send changed fields to minimize payload
-        const patch: ProjectUpdate = {};
-        const orig = originalRef.current;
-        if (orig) {
-          (Object.keys(form) as (keyof ProjectCreate)[]).forEach((k) => {
-            const cur = form[k];
-            const old = orig[k];
-            if (Array.isArray(cur) && Array.isArray(old)) {
-              if (JSON.stringify(cur) !== JSON.stringify(old)) (patch as Record<string, unknown>)[k] = cur;
-            } else if (cur !== old) {
-              (patch as Record<string, unknown>)[k] = cur;
-            }
-          });
-        } else {
-          Object.assign(patch, form);
-        }
-        // Always include name+slug as required identifiers
-        if (!patch.name) patch.name = form.name;
-        if (!patch.slug) patch.slug = form.slug;
-        saved = await api.updateProject(project.id, patch);
+
+    const optimisticProject: Project = project
+      ? { ...project, ...form, updatedAt: new Date().toISOString() }
+      : {
+          id: crypto.randomUUID(),
+          ...form,
+          coverUrl: "",
+          demoUrl: "",
+          pinned: false,
+          sortOrder: 0,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+
+    if (project) {
+      const patch: ProjectUpdate = {};
+      const orig = originalRef.current;
+      if (orig) {
+        (Object.keys(form) as (keyof ProjectCreate)[]).forEach((k) => {
+          const cur = form[k];
+          const old = orig[k];
+          if (Array.isArray(cur) && Array.isArray(old)) {
+            if (JSON.stringify(cur) !== JSON.stringify(old)) (patch as Record<string, unknown>)[k] = cur;
+          } else if (cur !== old) {
+            (patch as Record<string, unknown>)[k] = cur;
+          }
+        });
       } else {
-        saved = await api.createProject(form);
+        Object.assign(patch, form);
       }
-      onSaved(saved);
-    } catch {
-      alert("保存失败");
+      if (!patch.name) patch.name = form.name;
+      if (!patch.slug) patch.slug = form.slug;
+      saveQueue.enqueue({
+        id: project.id,
+        label: "保存项目",
+        execute: () => api.updateProject(project.id, patch),
+      });
+    } else {
+      saveQueue.enqueue({
+        id: optimisticProject.id,
+        label: "创建项目",
+        execute: () => api.createProject(form),
+      });
     }
+
     setSaving(false);
+    onSaved(optimisticProject);
   }
 
   return (

@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { api } from "../../api/client";
+import { saveQueue } from "../../api/saveQueue";
 import type { BlogCategory, BlogCategoryCreate, BlogPost, BlogPostCreate, BlogComment } from "../../api/types";
 import { useAdminStore } from "../../stores/adminStore";
 import { useWheelScroll } from "./useWheelScroll";
@@ -636,17 +637,22 @@ function PostEditor({
     ev.preventDefault();
     if (!form.title || !form.slug) return;
     setSaving(true);
-    try {
-      if (post) {
-        await api.updateBlogPost(post.id, form);
-      } else {
-        await api.createBlogPost(form);
-      }
-      onSaved();
-    } catch {
-      alert("保存失败");
+    const jobId = crypto.randomUUID();
+    if (post) {
+      saveQueue.enqueue({
+        id: jobId,
+        label: "保存文章",
+        execute: () => api.updateBlogPost(post.id, form),
+      });
+    } else {
+      saveQueue.enqueue({
+        id: jobId,
+        label: "创建文章",
+        execute: () => api.createBlogPost(form),
+      });
     }
     setSaving(false);
+    onSaved();
   }
 
   return (

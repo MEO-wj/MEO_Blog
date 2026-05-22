@@ -21,6 +21,7 @@ import { BlogBookshelf } from "./BlogBookshelf";
 import { MessageWallModal } from "./MessageWallModal";
 import { ResumeModal } from "./ResumeModal";
 import { FavoritesModal } from "./FavoritesModal";
+import { SaveToast } from "./SaveToast";
 import { api } from "../../api/client";
 import { useAdminStore } from "../../stores/adminStore";
 import { useSound } from "./useSound";
@@ -1027,6 +1028,8 @@ export function SwitchHomeScreen({
         <AdminPanel onClose={() => { playSound("close"); setAdminPanelOpen(false); }} />,
         document.body,
       )}
+
+      {createPortal(<SaveToast />, document.body)}
 
       {detailProject && createPortal(
         <ProjectDetail project={detailProject} loading={detailLoading} onClose={() => { playSound("close"); setDetailProject(null); setDetailLoading(false); }} />,

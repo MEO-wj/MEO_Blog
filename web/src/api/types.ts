@@ -58,6 +58,22 @@ export interface Project {
   updatedAt: string;
 }
 
+// Lightweight version for list views (omits description, repoUrl, demoUrl, techStack)
+export interface ProjectSummary {
+  id: string;
+  name: string;
+  slug: string;
+  coverUrl: string;
+  iconUrl: string;
+  accentColor: string;
+  category: string;
+  status: string;
+  pinned: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface AdminProfile {
   displayName: string;
   email: string;

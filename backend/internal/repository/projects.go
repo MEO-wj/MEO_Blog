@@ -27,6 +27,23 @@ type Project struct {
 	UpdatedAt   string   `json:"updatedAt"`
 }
 
+// ProjectSummary is a lightweight version of Project for list views.
+// Omits description, repoUrl, demoUrl, techStack.
+type ProjectSummary struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Slug        string `json:"slug"`
+	CoverURL    string `json:"coverUrl"`
+	IconURL     string `json:"iconUrl"`
+	AccentColor string `json:"accentColor"`
+	Category    string `json:"category"`
+	Status      string `json:"status"`
+	Pinned      bool   `json:"pinned"`
+	SortOrder   int    `json:"sortOrder"`
+	CreatedAt   string `json:"createdAt"`
+	UpdatedAt   string `json:"updatedAt"`
+}
+
 type ProjectCreate struct {
 	Name        string   `json:"name"`
 	Slug        string   `json:"slug"`
@@ -96,6 +113,51 @@ func ListProjects(ctx context.Context, db *pgxpool.Pool) ([]Project, error) {
 		projects = []Project{}
 	}
 	return projects, rows.Err()
+}
+
+const projectSummaryCols = `id, name, slug,
+	coalesce(cover_url,''), coalesce(icon_url,''),
+	coalesce(accent_color,'#24c9f4'), coalesce(category,''),
+	coalesce(status,'ready'), pinned, sort_order, created_at, updated_at`
+
+func ListProjectSummaries(ctx context.Context, db *pgxpool.Pool) ([]ProjectSummary, error) {
+	rows, err := db.Query(ctx,
+		`SELECT `+projectSummaryCols+`
+		 FROM projects ORDER BY sort_order ASC, created_at DESC`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var projects []ProjectSummary
+	for rows.Next() {
+		var p ProjectSummary
+		var createdAt, updatedAt time.Time
+		err := rows.Scan(
+			&p.ID, &p.Name, &p.Slug,
+			&p.CoverURL, &p.IconURL, &p.AccentColor,
+			&p.Category, &p.Status, &p.Pinned, &p.SortOrder,
+			&createdAt, &updatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		p.CreatedAt = createdAt.Format(time.RFC3339)
+		p.UpdatedAt = updatedAt.Format(time.RFC3339)
+		projects = append(projects, p)
+	}
+	if projects == nil {
+		projects = []ProjectSummary{}
+	}
+	return projects, rows.Err()
+}
+
+func GetProjectBySlug(ctx context.Context, db *pgxpool.Pool, slug string) (*Project, error) {
+	return scanProject(db.QueryRow(ctx,
+		`SELECT `+projectSelectCols+` FROM projects WHERE slug = $1`,
+		slug,
+	))
 }
 
 func CreateProject(ctx context.Context, db *pgxpool.Pool, c *ProjectCreate) (*Project, error) {

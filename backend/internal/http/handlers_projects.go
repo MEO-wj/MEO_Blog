@@ -15,12 +15,33 @@ import (
 
 func publicProjectsHandler(db *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("fields") == "summary" {
+			summaries, err := repository.ListProjectSummaries(r.Context(), db)
+			if err != nil {
+				RespondError(w, "LIST_FAILED", "failed to list projects", http.StatusInternalServerError)
+				return
+			}
+			RespondOK(w, summaries)
+			return
+		}
 		projects, err := repository.ListProjects(r.Context(), db)
 		if err != nil {
 			RespondError(w, "LIST_FAILED", "failed to list projects", http.StatusInternalServerError)
 			return
 		}
 		RespondOK(w, projects)
+	}
+}
+
+func getProjectBySlugHandler(db *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		slug := chi.URLParam(r, "slug")
+		project, err := repository.GetProjectBySlug(r.Context(), db, slug)
+		if err != nil {
+			RespondError(w, "NOT_FOUND", "project not found", http.StatusNotFound)
+			return
+		}
+		RespondOK(w, project)
 	}
 }
 

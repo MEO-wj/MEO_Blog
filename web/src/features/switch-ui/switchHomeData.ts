@@ -9,6 +9,7 @@ export interface SwitchHomeProject {
   accentColor: string;
   repoUrl?: string;
   route?: string;
+  slug?: string;
   status?: "ready" | "soon" | "external";
 }
 

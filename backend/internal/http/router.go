@@ -25,22 +25,23 @@ func NewRouter(cfg *config.Config, db *pgxpool.Pool, _ *redis.Client) http.Handl
 		r.Get("/admin/session", adminSessionHandler(cfg))
 		r.Post("/admin/logout", adminLogoutHandler(cfg))
 
-		r.Get("/projects", publicProjectsHandler(db))
-		r.Get("/profile", publicProfileHandler(db))
+		r.With(ETagMiddleware(computeProjectsETag, db)).Get("/projects", publicProjectsHandler(db))
+		r.With(ETagMiddleware(computeProjectDetailETag, db)).Get("/projects/{slug}", getProjectBySlugHandler(db))
+		r.With(ETagMiddleware(computeProfileETag, db)).Get("/profile", publicProfileHandler(db))
 
-		r.Get("/blog/categories", listBlogCategoriesHandler(db))
-		r.Get("/blog/posts", listBlogPostsHandler(db))
-		r.Get("/blog/posts/{id}", getBlogPostHandler(db))
+		r.With(ETagMiddleware(computeBlogCategoriesETag, db)).Get("/blog/categories", listBlogCategoriesHandler(db))
+		r.With(ETagMiddleware(computeBlogPostsETag, db)).Get("/blog/posts", listBlogPostsHandler(db))
+		r.With(ETagMiddleware(computeBlogPostsETag, db)).Get("/blog/posts/{id}", getBlogPostHandler(db))
 		r.Get("/blog/posts/{id}/comments", listBlogCommentsHandler(db))
 		r.Post("/blog/posts/{id}/comments", createBlogCommentHandler(db))
 
-		r.Get("/guestbook/messages", listGuestbookMessagesHandler(db))
+		r.With(ETagMiddleware(computeGuestbookETag, db)).Get("/guestbook/messages", listGuestbookMessagesHandler(db))
 		r.Post("/guestbook/messages", createGuestbookMessageHandler(db))
 		r.Post("/guestbook/messages/{id}/replies", userReplyGuestbookHandler(db))
 		r.Delete("/guestbook/messages/{id}", userDeleteGuestbookMessageHandler(db))
 
-		r.Get("/resume", getResumeHandler(db))
-		r.Get("/favorites", listFavoritesHandler(db))
+		r.With(ETagMiddleware(computeResumeETag, db)).Get("/resume", getResumeHandler(db))
+		r.With(ETagMiddleware(computeFavoritesETag, db)).Get("/favorites", listFavoritesHandler(db))
 
 		r.Get("/github/{username}", githubUserHandler(cfg))
 		r.Get("/github/{username}/contributions", githubContributionsHandler(cfg))

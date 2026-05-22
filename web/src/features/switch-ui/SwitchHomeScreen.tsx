@@ -390,12 +390,12 @@ export function SwitchHomeScreen({
   const [showFavorites, setShowFavorites] = useState(false);
   const [clock, setClock] = useState(() => new Date());
 
-  const { authenticated: isAdminAuthenticated, setAuthenticated: setAdminAuthenticated, profile, projects: storeProjects, rawProjects, setProjects: setStoreProjects, setProfile } = useAdminStore();
+  const { authenticated: isAdminAuthenticated, setAuthenticated: setAdminAuthenticated, profile, projects: storeProjects, setProjectSummaries, setProfile } = useAdminStore();
 
   const [dataRetryCount, setDataRetryCount] = useState(0);
 
   useEffect(() => {
-    api.getProjects().then((p) => setStoreProjects(p)).catch(() => {});
+    api.getProjectSummaries().then((p) => setProjectSummaries(p)).catch(() => {});
     api.getPublicProfile().then((p) => setProfile(p)).catch(() => {});
     api.checkSession().then((s) => {
       if (s.authenticated) setAdminAuthenticated(true);
@@ -857,12 +857,16 @@ export function SwitchHomeScreen({
               onDeselect={() => {
                 setHoveredProject(-1);
               }}
-              onOpen={() => {
-                console.log("[ProjectCard] onOpen fired:", project.title, "icon:", project.icon, "id:", project.id);
+              onOpen={async () => {
                 if (project.icon === "empty") return;
-                const raw = rawProjects.find((r) => r.id === project.id);
-                console.log("[ProjectCard] raw:", raw, "fallback:", project);
-                setDetailProject(raw ?? project);
+                if (project.slug) {
+                  try {
+                    const full = await api.getProjectDetail(project.slug);
+                    setDetailProject(full);
+                    return;
+                  } catch { /* fall through to show summary */ }
+                }
+                setDetailProject(project);
               }}
               onOpenRepo={() => openExternal(project.repoUrl)}
               onHoverSound={() => playSound("project-hover")}

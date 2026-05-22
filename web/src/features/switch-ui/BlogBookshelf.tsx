@@ -521,7 +521,7 @@ function ReaderView({
                 <button
                   className="blog-comment-delete"
                   onClick={() => {
-                    api.deleteBlogComment(c.id).then(() => handleCommentDeleted(c.id));
+                    api.deleteBlogComment(post.id, c.id).then(() => handleCommentDeleted(c.id));
                   }}
                 >
                   删除

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { api } from "../../api/client";
-import type { AdminProfile, Project, ProjectCreate, ProjectSummary } from "../../api/types";
+import type { AdminProfile, Project, ProjectCreate, ProjectSummary, ProjectUpdate } from "../../api/types";
 import { useAdminStore } from "../../stores/adminStore";
 import { useWheelScroll } from "./useWheelScroll";
 
@@ -445,33 +445,46 @@ function ProjectForm({
   onCancel: () => void;
   onSaved: (p: Project) => void;
 }) {
-  const [form, setForm] = useState<ProjectCreate>({
-    name: project?.name ?? "",
-    slug: project?.slug ?? "",
-    description: project?.description ?? "",
-    repoUrl: project?.repoUrl ?? "",
-    iconUrl: project?.iconUrl ?? "",
-    accentColor: project?.accentColor ?? "#24c9f4",
-    category: project?.category ?? "",
-    status: project?.status ?? "ready",
-    techStack: project?.techStack ?? [],
+  const [form, setForm] = useState<ProjectCreate>(() => {
+    const initial = {
+      name: project?.name ?? "",
+      slug: project?.slug ?? "",
+      description: project?.description ?? "",
+      repoUrl: project?.repoUrl ?? "",
+      iconUrl: project?.iconUrl ?? "",
+      accentColor: project?.accentColor ?? "#24c9f4",
+      category: project?.category ?? "",
+      status: project?.status ?? "ready",
+      techStack: project?.techStack ?? [],
+    };
+    // Only snapshot original if we already have full data (not a summary stub)
+    if (project?.description) originalRef.current = initial;
+    return initial;
   });
   const [saving, setSaving] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const originalRef = useRef<ProjectCreate | null>(null);
 
   // Load full detail when editing an existing project (form shows summary first)
   useEffect(() => {
     if (!project?.slug || project.description) return; // already has full data
     setDetailLoading(true);
     api.getProjectDetail(project.slug).then((full) => {
-      setForm((f) => ({
-        ...f,
+      const fullForm: ProjectCreate = {
+        name: full.name,
+        slug: full.slug,
         description: full.description ?? "",
         repoUrl: full.repoUrl ?? "",
+        iconUrl: full.iconUrl ?? "",
+        accentColor: full.accentColor ?? "#24c9f4",
+        category: full.category ?? "",
+        status: full.status ?? "ready",
         techStack: full.techStack ?? [],
-      }));
+      };
+      setForm(fullForm);
+      originalRef.current = fullForm;
     }).catch(() => {}).finally(() => setDetailLoading(false));
   }, [project?.slug]);
 
@@ -503,7 +516,26 @@ function ProjectForm({
     try {
       let saved: Project;
       if (project) {
-        saved = await api.updateProject(project.id, form);
+        // Only send changed fields to minimize payload
+        const patch: ProjectUpdate = {};
+        const orig = originalRef.current;
+        if (orig) {
+          (Object.keys(form) as (keyof ProjectCreate)[]).forEach((k) => {
+            const cur = form[k];
+            const old = orig[k];
+            if (Array.isArray(cur) && Array.isArray(old)) {
+              if (JSON.stringify(cur) !== JSON.stringify(old)) (patch as Record<string, unknown>)[k] = cur;
+            } else if (cur !== old) {
+              (patch as Record<string, unknown>)[k] = cur;
+            }
+          });
+        } else {
+          Object.assign(patch, form);
+        }
+        // Always include name+slug as required identifiers
+        if (!patch.name) patch.name = form.name;
+        if (!patch.slug) patch.slug = form.slug;
+        saved = await api.updateProject(project.id, patch);
       } else {
         saved = await api.createProject(form);
       }

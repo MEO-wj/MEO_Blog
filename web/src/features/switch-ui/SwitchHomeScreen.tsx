@@ -280,8 +280,7 @@ function ProjectCard({
       onMouseLeave={() => {
         if (!dragging) onDeselect();
       }}
-      onClick={(e) => {
-        console.log("[ProjectCard] click:", project.title, "target:", (e.target as HTMLElement).className);
+      onClick={() => {
         onClickSound?.();
         onOpen();
       }}
@@ -684,7 +683,6 @@ export function SwitchHomeScreen({
     adminGateCodeRef.current = `${adminGateCodeRef.current}${ADMIN_GATE_CODE_PARTS[key]}`.slice(
       -ADMIN_GATE_MAX_INPUTS,
     );
-    console.log("[admin-gate] key:", key, "-> code:", adminGateCodeRef.current);
   }
 
   async function handleAdminLogin(event: FormEvent<HTMLFormElement>) {
@@ -699,7 +697,6 @@ export function SwitchHomeScreen({
 
     setAdminAuthStatus("submitting");
     setAdminAuthMessage("正在校验身份...");
-    console.log("[admin-login] password:", password, "sequence:", adminGateCodeRef.current);
 
     try {
       await requestAdminLogin(password, adminGateCodeRef.current);
@@ -799,8 +796,7 @@ export function SwitchHomeScreen({
       className={`switch-home-screen ${focused ? "is-focused" : "is-ambient"}`}
       data-presentation={presentation}
       aria-label="Switch 主界面"
-      onClick={(e) => {
-        console.log("[SwitchHome] section click, focused:", focused, "target:", (e.target as HTMLElement).className);
+      onClick={() => {
         if (!focused) onRequestFocus();
       }}
     >

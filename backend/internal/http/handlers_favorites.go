@@ -93,6 +93,7 @@ func adminUpdateFavoritePositionHandler(db *pgxpool.Pool) http.HandlerFunc {
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
+		r.Body = http.MaxBytesReader(w, r.Body, 1<<10)
 		var req positionReq
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			RespondError(w, "INVALID_JSON", "request body must be valid JSON", http.StatusBadRequest)

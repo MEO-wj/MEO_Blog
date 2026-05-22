@@ -1,12 +1,15 @@
 package http
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"net"
 	"net/http"
 	"strings"
@@ -14,6 +17,7 @@ import (
 	"time"
 
 	"github.com/meo-blog/backend/internal/config"
+	"github.com/redis/go-redis/v9"
 )
 
 const adminSessionTTL = 7 * 24 * time.Hour
@@ -100,10 +104,16 @@ func adminLoginHandler(cfg *config.Config) http.HandlerFunc {
 	}
 }
 
-func adminSessionHandler(cfg *config.Config) http.HandlerFunc {
+func adminSessionHandler(cfg *config.Config, rdb *redis.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie(adminSessionCookieName)
 		if err != nil || !verifyAdminSession(cfg.JWTSecret, cookie.Value) {
+			RespondError(w, "ADMIN_SESSION_INVALID", "invalid admin session", http.StatusUnauthorized)
+			return
+		}
+
+		// Check if token has been revoked
+		if isTokenBlacklisted(r.Context(), rdb, cookie.Value) {
 			RespondError(w, "ADMIN_SESSION_INVALID", "invalid admin session", http.StatusUnauthorized)
 			return
 		}
@@ -114,8 +124,14 @@ func adminSessionHandler(cfg *config.Config) http.HandlerFunc {
 	}
 }
 
-func adminLogoutHandler(cfg *config.Config) http.HandlerFunc {
+func adminLogoutHandler(cfg *config.Config, rdb *redis.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		cookie, err := r.Cookie(adminSessionCookieName)
+		if err == nil && cookie.Value != "" {
+			// Blacklist the token until its expiry
+			blacklistToken(r.Context(), rdb, cfg.JWTSecret, cookie.Value)
+		}
+
 		// Clear the cookie
 		http.SetCookie(w, &http.Cookie{
 			Name:     adminSessionCookieName,
@@ -130,6 +146,52 @@ func adminLogoutHandler(cfg *config.Config) http.HandlerFunc {
 			"loggedOut": true,
 		})
 	}
+}
+
+func tokenHash(token string) string {
+	h := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(h[:])
+}
+
+func blacklistToken(ctx context.Context, rdb *redis.Client, secret, token string) {
+	if rdb == nil {
+		return
+	}
+	claims, err := decodeAdminSession(token)
+	if err != nil {
+		return
+	}
+	ttl := time.Until(time.Unix(claims.Expires, 0))
+	if ttl <= 0 {
+		return
+	}
+	key := "admin:blacklist:" + tokenHash(token)
+	rdb.Set(ctx, key, "1", ttl)
+}
+
+func isTokenBlacklisted(ctx context.Context, rdb *redis.Client, token string) bool {
+	if rdb == nil {
+		return false
+	}
+	key := "admin:blacklist:" + tokenHash(token)
+	exists, err := rdb.Exists(ctx, key).Result()
+	return err == nil && exists > 0
+}
+
+func decodeAdminSession(token string) (*adminSessionClaims, error) {
+	parts := strings.Split(token, ".")
+	if len(parts) != 2 {
+		return nil, fmt.Errorf("invalid token format")
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(parts[0])
+	if err != nil {
+		return nil, err
+	}
+	var claims adminSessionClaims
+	if err := json.Unmarshal(payload, &claims); err != nil {
+		return nil, err
+	}
+	return &claims, nil
 }
 
 func secretMatches(input, expected string) bool {

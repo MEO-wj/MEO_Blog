@@ -3,6 +3,7 @@ package http
 import (
 	"encoding/json"
 	"fmt"
+	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -26,6 +27,7 @@ func getProfileHandler(db *pgxpool.Pool) http.HandlerFunc {
 
 func updateProfileHandler(db *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, 256<<10)
 		var u repository.ProfileUpdate
 		if err := json.NewDecoder(r.Body).Decode(&u); err != nil {
 			RespondError(w, "INVALID_JSON", "invalid request body", http.StatusBadRequest)
@@ -68,7 +70,7 @@ func faviconHandler(db *pgxpool.Pool, cfg *config.Config) http.HandlerFunc {
 			filePath := filepath.Join(cfg.UploadDir, strings.TrimPrefix(profile.AvatarURL, "/uploads/"))
 			data, ferr := os.ReadFile(filePath)
 			if ferr == nil {
-				w.Header().Set("Content-Type", "image/jpeg")
+				w.Header().Set("Content-Type", detectImageContentType(filePath, data))
 				w.Write(data)
 				return
 			}
@@ -104,4 +106,16 @@ func uploadResumeHandler(db *pgxpool.Pool, cfg *config.Config) http.HandlerFunc 
 		}
 		RespondOK(w, map[string]string{"url": url})
 	}
+}
+
+func detectImageContentType(filePath string, data []byte) string {
+	ext := strings.ToLower(filepath.Ext(filePath))
+	if ct := mime.TypeByExtension(ext); ct != "" {
+		return ct
+	}
+	ct := http.DetectContentType(data)
+	if ct == "application/octet-stream" {
+		return "image/jpeg"
+	}
+	return ct
 }

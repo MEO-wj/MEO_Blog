@@ -25,7 +25,6 @@ var allowedMimeTypes = map[string]string{
 	"image/png":  ".png",
 	"image/webp": ".webp",
 	"image/gif":  ".gif",
-	"image/svg+xml": ".svg",
 }
 
 func uploadAvatarHandler(db *pgxpool.Pool, cfg *config.Config) http.HandlerFunc {
@@ -148,7 +147,7 @@ func compressImage(data []byte, ext string) ([]byte, string, error) {
 
 	// PNG with transparency → re-encode as compressed PNG
 	if ext == ".png" {
-		if hasAlpha(data) {
+		if imageHasAlpha(src) {
 			var buf bytes.Buffer
 			enc := png.Encoder{CompressionLevel: png.BestCompression}
 			if err := enc.Encode(&buf, src); err != nil {
@@ -168,15 +167,11 @@ func compressImage(data []byte, ext string) ([]byte, string, error) {
 	return buf.Bytes(), ext, nil
 }
 
-// hasAlpha checks if a PNG has meaningful alpha channel.
-func hasAlpha(data []byte) bool {
-	img, err := png.Decode(bytes.NewReader(data))
-	if err != nil {
-		return false
-	}
-	// Check if any pixel has non-opaque alpha
-	for y := img.Bounds().Min.Y; y < img.Bounds().Max.Y; y += 4 {
-		for x := img.Bounds().Min.X; x < img.Bounds().Max.X; x += 4 {
+// imageHasAlpha checks if an image has meaningful alpha channel (sampled).
+func imageHasAlpha(img image.Image) bool {
+	b := img.Bounds()
+	for y := b.Min.Y; y < b.Max.Y; y += 4 {
+		for x := b.Min.X; x < b.Max.X; x += 4 {
 			_, _, _, a := img.At(x, y).RGBA()
 			if a < 0xFFFF {
 				return true

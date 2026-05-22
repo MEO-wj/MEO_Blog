@@ -20,6 +20,12 @@ func main() {
 
 	cfg := config.Load()
 
+	// Security: reject default JWT secret in production
+	if cfg.AppEnv == "production" && cfg.JWTSecret == "dev-secret-change-me" {
+		slog.Error("JWT_SECRET must be set to a non-default value in production")
+		os.Exit(1)
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 

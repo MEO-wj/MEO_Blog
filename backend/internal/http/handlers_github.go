@@ -31,6 +31,20 @@ func initGitHubProxy(cfg *config.Config) {
 		token: cfg.GitHubToken,
 		cache: make(map[string]githubCacheEntry),
 	}
+	// Evict expired cache entries every 5 minutes
+	go func() {
+		for {
+			time.Sleep(5 * time.Minute)
+			ghProxy.mu.Lock()
+			now := time.Now()
+			for k, v := range ghProxy.cache {
+				if now.After(v.expiresAt) {
+					delete(ghProxy.cache, k)
+				}
+			}
+			ghProxy.mu.Unlock()
+		}
+	}()
 }
 
 func (p *githubProxy) fetch(url string) ([]byte, int, error) {
@@ -109,7 +123,7 @@ func githubUserHandler(cfg *config.Config) http.HandlerFunc {
 
 		userData, userStatus, userErr := ghProxy.fetch(userURL)
 		if userErr != nil {
-			RespondError(w, "GITHUB_FETCH_FAILED", userErr.Error(), http.StatusBadGateway)
+			RespondError(w, "GITHUB_FETCH_FAILED", "failed to fetch GitHub data", http.StatusBadGateway)
 			return
 		}
 		if userStatus != 200 {
@@ -162,10 +176,10 @@ func githubContributionsHandler(cfg *config.Config) http.HandlerFunc {
 			return
 		}
 
-		// Use GitHub GraphQL API with viewer query to get ALL contributions (public + private)
-		query := map[string]string{
-			"query": `{
-				viewer {
+		// Use GitHub GraphQL API to get contributions (public + private if token has scope)
+		query := map[string]any{
+			"query": `query ($login: String!) {
+				user(login: $login) {
 					contributionsCollection {
 						contributionCalendar {
 							totalContributions
@@ -180,6 +194,7 @@ func githubContributionsHandler(cfg *config.Config) http.HandlerFunc {
 					}
 				}
 			}`,
+			"variables": map[string]string{"login": username},
 		}
 
 		body, err := json.Marshal(query)
@@ -200,7 +215,7 @@ func githubContributionsHandler(cfg *config.Config) http.HandlerFunc {
 
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
-			RespondError(w, "CONTRIB_FETCH_FAILED", err.Error(), http.StatusBadGateway)
+			RespondError(w, "CONTRIB_FETCH_FAILED", "failed to fetch contributions", http.StatusBadGateway)
 			return
 		}
 		defer resp.Body.Close()
@@ -219,7 +234,7 @@ func githubContributionsHandler(cfg *config.Config) http.HandlerFunc {
 		// Parse GraphQL response
 		var gqlResp struct {
 			Data struct {
-				Viewer struct {
+				User *struct {
 					ContributionsCollection struct {
 						ContributionCalendar struct {
 							TotalContributions int `json:"totalContributions"`
@@ -232,7 +247,7 @@ func githubContributionsHandler(cfg *config.Config) http.HandlerFunc {
 							} `json:"weeks"`
 						} `json:"contributionCalendar"`
 					} `json:"contributionsCollection"`
-				} `json:"viewer"`
+				} `json:"user"`
 			} `json:"data"`
 			Errors []struct {
 				Message string `json:"message"`
@@ -249,9 +264,14 @@ func githubContributionsHandler(cfg *config.Config) http.HandlerFunc {
 			return
 		}
 
+		if gqlResp.Data.User == nil {
+			RespondError(w, "GITHUB_USER_NOT_FOUND", fmt.Sprintf("GitHub user '%s' not found", username), http.StatusNotFound)
+			return
+		}
+
 		// Convert to flat list of contribution days
 		var contributions []contribDay
-		for _, week := range gqlResp.Data.Viewer.ContributionsCollection.ContributionCalendar.Weeks {
+		for _, week := range gqlResp.Data.User.ContributionsCollection.ContributionCalendar.Weeks {
 			for _, day := range week.ContributionDays {
 				level := 0
 				if day.ContributionCount > 0 {
@@ -275,7 +295,7 @@ func githubContributionsHandler(cfg *config.Config) http.HandlerFunc {
 
 		RespondOK(w, map[string]any{
 			"contributions":      contributions,
-			"totalContributions": gqlResp.Data.Viewer.ContributionsCollection.ContributionCalendar.TotalContributions,
+			"totalContributions": gqlResp.Data.User.ContributionsCollection.ContributionCalendar.TotalContributions,
 		})
 	}
 }

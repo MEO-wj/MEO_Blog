@@ -10,7 +10,7 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-func NewRouter(cfg *config.Config, db *pgxpool.Pool, _ *redis.Client) http.Handler {
+func NewRouter(cfg *config.Config, db *pgxpool.Pool, rdb *redis.Client) http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
@@ -22,26 +22,26 @@ func NewRouter(cfg *config.Config, db *pgxpool.Pool, _ *redis.Client) http.Handl
 		r.Get("/health", healthHandler)
 		r.Get("/favicon", faviconHandler(db, cfg))
 		r.Post("/admin/login", adminLoginHandler(cfg))
-		r.Get("/admin/session", adminSessionHandler(cfg))
-		r.Post("/admin/logout", adminLogoutHandler(cfg))
+		r.Get("/admin/session", adminSessionHandler(cfg, rdb))
+		r.Post("/admin/logout", adminLogoutHandler(cfg, rdb))
 
-		r.With(ETagMiddleware(computeProjectsETag, db)).Get("/projects", publicProjectsHandler(db))
-		r.With(ETagMiddleware(computeProjectDetailETag, db)).Get("/projects/{slug}", getProjectBySlugHandler(db))
-		r.With(ETagMiddleware(computeProfileETag, db)).Get("/profile", publicProfileHandler(db))
+		r.With(ETagMiddleware(computeProjectsETag, db, "projects")).Get("/projects", publicProjectsHandler(db))
+		r.With(ETagMiddleware(computeProjectDetailETag, db, "project-detail")).Get("/projects/{slug}", getProjectBySlugHandler(db))
+		r.With(ETagMiddleware(computeProfileETag, db, "profile")).Get("/profile", publicProfileHandler(db))
 
-		r.With(ETagMiddleware(computeBlogCategoriesETag, db)).Get("/blog/categories", listBlogCategoriesHandler(db))
-		r.With(ETagMiddleware(computeBlogPostsETag, db)).Get("/blog/posts", listBlogPostsHandler(db))
-		r.With(ETagMiddleware(computeBlogPostsETag, db)).Get("/blog/posts/{id}", getBlogPostHandler(db))
+		r.With(ETagMiddleware(computeBlogCategoriesETag, db, "blog-cats")).Get("/blog/categories", listBlogCategoriesHandler(db))
+		r.With(ETagMiddleware(computeBlogPostsETag, db, "blog-posts")).Get("/blog/posts", listBlogPostsHandler(db))
+		r.With(ETagMiddleware(computeBlogPostsETag, db, "blog-posts")).Get("/blog/posts/{id}", getBlogPostHandler(db))
 		r.Get("/blog/posts/{id}/comments", listBlogCommentsHandler(db))
-		r.Post("/blog/posts/{id}/comments", createBlogCommentHandler(db))
+		r.With(middleware.RateLimit(2, 10)).Post("/blog/posts/{id}/comments", createBlogCommentHandler(db))
 
-		r.With(ETagMiddleware(computeGuestbookETag, db)).Get("/guestbook/messages", listGuestbookMessagesHandler(db))
-		r.Post("/guestbook/messages", createGuestbookMessageHandler(db))
-		r.Post("/guestbook/messages/{id}/replies", userReplyGuestbookHandler(db))
-		r.Delete("/guestbook/messages/{id}", userDeleteGuestbookMessageHandler(db))
+		r.With(ETagMiddleware(computeGuestbookETag, db, "guestbook")).Get("/guestbook/messages", listGuestbookMessagesHandler(db))
+		r.With(middleware.RateLimit(2, 10)).Post("/guestbook/messages", createGuestbookMessageHandler(db))
+		r.With(middleware.RateLimit(2, 10)).Post("/guestbook/messages/{id}/replies", userReplyGuestbookHandler(db))
+		r.With(middleware.RateLimit(2, 10)).Delete("/guestbook/messages/{id}", userDeleteGuestbookMessageHandler(db))
 
-		r.With(ETagMiddleware(computeResumeETag, db)).Get("/resume", getResumeHandler(db))
-		r.With(ETagMiddleware(computeFavoritesETag, db)).Get("/favorites", listFavoritesHandler(db))
+		r.With(ETagMiddleware(computeResumeETag, db, "resume")).Get("/resume", getResumeHandler(db))
+		r.With(ETagMiddleware(computeFavoritesETag, db, "favorites")).Get("/favorites", listFavoritesHandler(db))
 
 		r.Get("/github/{username}", githubUserHandler(cfg))
 		r.Get("/github/{username}/contributions", githubContributionsHandler(cfg))

@@ -177,7 +177,8 @@ const blogPostSelectCols = `id, slug, title, coalesce(summary,''), coalesce(cont
 	coalesce(cast(category_id as text),''), published_at, created_at, updated_at`
 
 func ListBlogPosts(ctx context.Context, db *pgxpool.Pool, categoryID string, includeDrafts bool) ([]BlogPost, error) {
-	query := `SELECT id, slug, title, coalesce(summary,''), coalesce(content_md,''),
+	// List queries exclude content_md for efficiency; use GetBlogPost for full content.
+	query := `SELECT id, slug, title, coalesce(summary,''), '',
 		coalesce(cover_url,''), coalesce(status,'draft'),
 		coalesce(cast(category_id as text),''), published_at, created_at, updated_at
 		FROM posts`
@@ -194,15 +195,12 @@ func ListBlogPosts(ctx context.Context, db *pgxpool.Pool, categoryID string, inc
 	}
 
 	if includeDrafts {
-		query += ` ORDER BY created_at DESC`
+		query += ` ORDER BY created_at DESC LIMIT 200`
 	} else {
-		query += ` ORDER BY published_at DESC NULLS LAST, created_at DESC`
+		query += ` ORDER BY published_at DESC NULLS LAST, created_at DESC LIMIT 50`
 	}
 
 	rows, err := db.Query(ctx, query, args...)
-	if err != nil {
-		return nil, err
-	}
 	if err != nil {
 		return nil, err
 	}

@@ -3,6 +3,7 @@ package http
 import (
 	"encoding/json"
 	"net/http"
+	"regexp"
 )
 
 type APIResponse struct {
@@ -40,6 +41,12 @@ func RespondError(w http.ResponseWriter, code string, message string, status int
 	RespondJSON(w, status, APIResponse{
 		Error: &APIError{Code: code, Message: message},
 	})
+}
+
+var slugRegex = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
+
+func isValidSlug(slug string) bool {
+	return len(slug) > 0 && len(slug) <= 100 && slugRegex.MatchString(slug)
 }
 
 func RespondPaginated(w http.ResponseWriter, data interface{}, page, pageSize, total int) {

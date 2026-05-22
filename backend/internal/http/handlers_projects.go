@@ -47,6 +47,7 @@ func getProjectBySlugHandler(db *pgxpool.Pool) http.HandlerFunc {
 
 func createProjectHandler(db *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, 256<<10)
 		var c repository.ProjectCreate
 		if err := json.NewDecoder(r.Body).Decode(&c); err != nil {
 			RespondError(w, "INVALID_JSON", "invalid request body", http.StatusBadRequest)
@@ -56,9 +57,13 @@ func createProjectHandler(db *pgxpool.Pool) http.HandlerFunc {
 			RespondError(w, "VALIDATION_ERROR", "name and slug are required", http.StatusBadRequest)
 			return
 		}
+		if !isValidSlug(c.Slug) {
+			RespondError(w, "VALIDATION_ERROR", "slug must be lowercase alphanumeric with hyphens", http.StatusBadRequest)
+			return
+		}
 		project, err := repository.CreateProject(r.Context(), db, &c)
 		if err != nil {
-			RespondError(w, "CREATE_FAILED", "failed to create project: "+err.Error(), http.StatusInternalServerError)
+			RespondError(w, "CREATE_FAILED", "failed to create project", http.StatusInternalServerError)
 			return
 		}
 		RespondOK(w, project)
@@ -68,9 +73,14 @@ func createProjectHandler(db *pgxpool.Pool) http.HandlerFunc {
 func updateProjectHandler(db *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
+		r.Body = http.MaxBytesReader(w, r.Body, 256<<10)
 		var u repository.ProjectUpdate
 		if err := json.NewDecoder(r.Body).Decode(&u); err != nil {
 			RespondError(w, "INVALID_JSON", "invalid request body", http.StatusBadRequest)
+			return
+		}
+		if u.Slug != nil && !isValidSlug(*u.Slug) {
+			RespondError(w, "VALIDATION_ERROR", "slug must be lowercase alphanumeric with hyphens", http.StatusBadRequest)
 			return
 		}
 		project, err := repository.UpdateProject(r.Context(), db, id, &u)
@@ -87,6 +97,7 @@ func adminReorderProjectsHandler(db *pgxpool.Pool) http.HandlerFunc {
 		IDs []string `json:"ids"`
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, 16<<10)
 		var req reorderReq
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			RespondError(w, "INVALID_JSON", "request body must be valid JSON", http.StatusBadRequest)

@@ -42,6 +42,7 @@ func listGuestbookMessagesHandler(db *pgxpool.Pool) http.HandlerFunc {
 
 func createGuestbookMessageHandler(db *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
 		var c repository.GuestbookMessageCreate
 		if err := json.NewDecoder(r.Body).Decode(&c); err != nil {
 			RespondError(w, "INVALID_JSON", "invalid request body", http.StatusBadRequest)
@@ -76,6 +77,7 @@ func createGuestbookMessageHandler(db *pgxpool.Pool) http.HandlerFunc {
 func userReplyGuestbookHandler(db *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		messageID := chi.URLParam(r, "id")
+		r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
 		var body struct {
 			Nickname string `json:"nickname"`
 			Content  string `json:"content"`
@@ -128,6 +130,7 @@ func userDeleteGuestbookMessageHandler(db *pgxpool.Pool) http.HandlerFunc {
 func adminReplyGuestbookHandler(db *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		messageID := chi.URLParam(r, "id")
+		r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
 		var c repository.GuestbookReplyCreate
 		if err := json.NewDecoder(r.Body).Decode(&c); err != nil {
 			RespondError(w, "INVALID_JSON", "invalid request body", http.StatusBadRequest)

@@ -54,6 +54,14 @@ export function invalidateCache(path: string): void {
   localStorage.removeItem(`cache:${path}`);
 }
 
+/** Synchronous cache read for store initialization only (no background fetch).
+ *  The component's useEffect will handle the async refresh via request(). */
+export function readCacheSync<T>(path: string, cacheMs: number): T | null {
+  const cacheKey = `GET:${path}`;
+  const cached = getCache(cacheKey, cacheMs);
+  return cached !== null ? (cached.data as T) : null;
+}
+
 async function request<T>(path: string, init?: RequestInit, retries = 2, cacheMs?: number): Promise<T> {
   const isFormData = init?.body instanceof FormData;
   const headers: Record<string, string> = isFormData

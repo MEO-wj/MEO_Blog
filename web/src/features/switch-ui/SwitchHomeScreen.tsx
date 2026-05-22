@@ -287,7 +287,7 @@ function ProjectCard({
       <div className={`switch-project-cover ${project.iconUrl ? "has-custom-icon" : ""}`} data-icon={project.icon ?? "empty"}>
         <span className="switch-project-art" aria-hidden="true">
           {project.iconUrl ? (
-            <img src={project.iconUrl} alt="" className="switch-project-custom-icon" draggable="false" loading="lazy" />
+            <img src={project.iconUrl} alt="" className="switch-project-custom-icon" draggable="false" />
           ) : (
             <span>{project.coverLabel}</span>
           )}
@@ -383,6 +383,7 @@ export function SwitchHomeScreen({
   const [adminAuthMessage, setAdminAuthMessage] = useState("");
   const [adminPanelOpen, setAdminPanelOpen] = useState(false);
   const [detailProject, setDetailProject] = useState<Project | SwitchHomeProject | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [showGithub, setShowGithub] = useState(false);
   const [showBlog, setShowBlog] = useState(false);
   const [showGuestbook, setShowGuestbook] = useState(false);
@@ -859,14 +860,16 @@ export function SwitchHomeScreen({
               }}
               onOpen={async () => {
                 if (project.icon === "empty") return;
+                // Show detail modal immediately with summary data
+                setDetailProject(project);
+                setDetailLoading(true);
                 if (project.slug) {
                   try {
                     const full = await api.getProjectDetail(project.slug);
                     setDetailProject(full);
-                    return;
-                  } catch { /* fall through to show summary */ }
+                  } catch { /* keep showing summary */ }
                 }
-                setDetailProject(project);
+                setDetailLoading(false);
               }}
               onOpenRepo={() => openExternal(project.repoUrl)}
               onHoverSound={() => playSound("project-hover")}
@@ -1026,7 +1029,7 @@ export function SwitchHomeScreen({
       )}
 
       {detailProject && createPortal(
-        <ProjectDetail project={detailProject} onClose={() => { playSound("close"); setDetailProject(null); }} />,
+        <ProjectDetail project={detailProject} loading={detailLoading} onClose={() => { playSound("close"); setDetailProject(null); setDetailLoading(false); }} />,
         document.body,
       )}
 

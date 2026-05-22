@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { api } from "../../api/client";
-import type { AdminProfile, Project, ProjectCreate } from "../../api/types";
+import type { AdminProfile, Project, ProjectCreate, ProjectSummary } from "../../api/types";
 import { useAdminStore } from "../../stores/adminStore";
 import { useWheelScroll } from "./useWheelScroll";
 
@@ -15,7 +15,7 @@ const ACCENT_COLORS = [
 
 export function AdminPanel({ onClose }: AdminPanelProps) {
   const [tab, setTab] = useState<"profile" | "projects">("profile");
-  const { setProfile, setProjects, logout } = useAdminStore();
+  const { setProfile, setProjectSummaries, logout } = useAdminStore();
   const scrollRef = useWheelScroll<HTMLDivElement>();
 
   async function handleLogout() {
@@ -65,7 +65,7 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
             <ProfileEditor onSave={(p) => setProfile(p)} />
           )}
           {tab === "projects" && (
-            <ProjectManager onSave={(p) => setProjects(p)} />
+            <ProjectManager onSave={(p) => setProjectSummaries(p)} />
           )}
         </div>
       </div>
@@ -274,16 +274,18 @@ function ProfileEditor({ onSave }: { onSave: (p: AdminProfile) => void }) {
   );
 }
 
-function ProjectManager({ onSave }: { onSave: (p: Project[]) => void }) {
-  const [projects, setProjects] = useState<Project[]>([]);
+function ProjectManager({ onSave }: { onSave: (p: ProjectSummary[]) => void }) {
+  const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [editing, setEditing] = useState<Project | null>(null);
   const [creating, setCreating] = useState(false);
   const [loading, setLoading] = useState(true);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [overIdx, setOverIdx] = useState<number | null>(null);
 
+  // Load summaries — cache sync in store avoids empty flash,
+  // this call returns cached data and fires background refresh only if needed
   useEffect(() => {
-    api.getProjects().then((p) => {
+    api.getProjectSummaries().then((p) => {
       setProjects(p);
       onSave(p);
       setLoading(false);
@@ -298,15 +300,34 @@ function ProjectManager({ onSave }: { onSave: (p: Project[]) => void }) {
     onSave(updated);
   }
 
-  function handleSaved(project: Project) {
-    let updated: Project[];
-    if (creating) {
-      updated = [...projects, project];
-    } else {
-      updated = projects.map((p) => (p.id === project.id ? project : p));
-    }
-    setProjects(updated);
-    onSave(updated);
+  function handleEdit(p: ProjectSummary) {
+    // Immediately show form with summary data (instant feedback)
+    setEditing({
+      id: p.id,
+      name: p.name,
+      slug: p.slug,
+      iconUrl: p.iconUrl,
+      accentColor: p.accentColor,
+      category: p.category,
+      status: p.status,
+      pinned: p.pinned,
+      sortOrder: p.sortOrder,
+      createdAt: p.createdAt,
+      updatedAt: p.updatedAt,
+      coverUrl: "",
+      description: "",
+      repoUrl: "",
+      demoUrl: "",
+      techStack: [],
+    } as Project);
+    // Full detail loaded inside ProjectForm
+  }
+
+  function handleSaved(_project: Project) {
+    api.getProjectSummaries().then((p) => {
+      setProjects(p);
+      onSave(p);
+    }).catch(() => {});
     setEditing(null);
     setCreating(false);
   }
@@ -388,17 +409,17 @@ function ProjectManager({ onSave }: { onSave: (p: Project[]) => void }) {
             style={{ background: p.accentColor || "#24c9f4" }}
           >
             {p.iconUrl ? (
-              <img src={p.iconUrl} alt="" loading="lazy" />
+              <img src={p.iconUrl} alt="" />
             ) : (
               <span>{p.name.charAt(0)}</span>
             )}
           </div>
           <div className="admin-project-info">
             <strong>{p.name}</strong>
-            <span>{p.description?.slice(0, 50)}</span>
+            <span>{p.category}</span>
           </div>
           <div className="admin-project-actions">
-            <button type="button" onClick={() => setEditing(p)}>
+            <button type="button" onClick={() => handleEdit(p)}>
               编辑
             </button>
             <button
@@ -437,7 +458,22 @@ function ProjectForm({
   });
   const [saving, setSaving] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Load full detail when editing an existing project (form shows summary first)
+  useEffect(() => {
+    if (!project?.slug || project.description) return; // already has full data
+    setDetailLoading(true);
+    api.getProjectDetail(project.slug).then((full) => {
+      setForm((f) => ({
+        ...f,
+        description: full.description ?? "",
+        repoUrl: full.repoUrl ?? "",
+        techStack: full.techStack ?? [],
+      }));
+    }).catch(() => {}).finally(() => setDetailLoading(false));
+  }, [project?.slug]);
 
   function autoSlug(name: string) {
     return name
@@ -508,13 +544,21 @@ function ProjectForm({
       </div>
       <label>
         <span>项目简介（支持 Markdown 格式）</span>
-        <textarea
-          rows={6}
-          value={form.description}
-          onChange={(e) =>
-            setForm((f) => ({ ...f, description: e.target.value }))
-          }
-        />
+        {detailLoading ? (
+          <div className="admin-detail-skeleton">
+            <div className="admin-skeleton-line" />
+            <div className="admin-skeleton-line short" />
+            <div className="admin-skeleton-line" />
+          </div>
+        ) : (
+          <textarea
+            rows={6}
+            value={form.description}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, description: e.target.value }))
+            }
+          />
+        )}
       </label>
       <div className="admin-form-row">
         <label>
@@ -588,7 +632,9 @@ function ProjectForm({
           <span>技术栈</span>
           <button type="button" onClick={() => setShowPicker(true)}>+ 添加</button>
         </div>
-        {form.techStack.length > 0 ? (
+        {detailLoading ? (
+          <p className="admin-tech-stack-empty">加载中...</p>
+        ) : form.techStack.length > 0 ? (
           <div className="admin-tech-stack-chips">
             {form.techStack.map((t) => (
               <span key={t} className="admin-tech-stack-chip">

@@ -7,6 +7,7 @@ import { useWheelScroll } from "./useWheelScroll";
 
 interface ProjectDetailProps {
   project: Project | SwitchHomeProject;
+  loading?: boolean;
   onClose: () => void;
 }
 
@@ -21,7 +22,7 @@ function isFullProject(p: Project | SwitchHomeProject): p is Project {
   return "name" in p && "slug" in p;
 }
 
-export function ProjectDetail({ project, onClose }: ProjectDetailProps) {
+export function ProjectDetail({ project, loading, onClose }: ProjectDetailProps) {
   const accent = project.accentColor || "#24c9f4";
   const scrollRef = useWheelScroll<HTMLDivElement>();
 
@@ -85,7 +86,17 @@ export function ProjectDetail({ project, onClose }: ProjectDetailProps) {
             </div>
           )}
 
-          {description && (
+          {loading ? (
+            <>
+              <h3 className="project-detail-subtitle">项目简介</h3>
+              <hr className="project-detail-divider" />
+              <div className="project-detail-loading">
+                <div className="project-detail-skeleton" />
+                <div className="project-detail-skeleton short" />
+                <div className="project-detail-skeleton" />
+              </div>
+            </>
+          ) : description ? (
             <>
               <h3 className="project-detail-subtitle">项目简介</h3>
               <hr className="project-detail-divider" />
@@ -93,7 +104,7 @@ export function ProjectDetail({ project, onClose }: ProjectDetailProps) {
                 <Markdown remarkPlugins={[remarkGfm]}>{description}</Markdown>
               </div>
             </>
-          )}
+          ) : null}
 
           <div className="project-detail-actions">
             {repoUrl && (

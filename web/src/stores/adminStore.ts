@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { readCacheSync } from "../api/client";
 import type { AdminProfile, Project, ProjectSummary } from "../api/types";
 import type { SwitchHomeProject } from "../features/switch-ui/switchHomeData";
 
@@ -45,10 +46,15 @@ export function mapProjectSummary(p: ProjectSummary): SwitchHomeProject {
   };
 }
 
+// Initialize from localStorage cache to avoid empty flash on mount
+const cachedSummaries = readCacheSync<ProjectSummary[]>("/projects?fields=summary", 5 * 60 * 1000);
+const cachedProfile = readCacheSync<AdminProfile>("/profile", 10 * 60 * 1000);
+const initialProjects = cachedSummaries ? cachedSummaries.map(mapProjectSummary) : [];
+
 export const useAdminStore = create<AdminStore>((set) => ({
   authenticated: false,
-  profile: null,
-  projects: [],
+  profile: cachedProfile,
+  projects: initialProjects,
   rawProjects: [],
   setAuthenticated: (v) => set({ authenticated: v }),
   setProfile: (p) => set({ profile: p }),

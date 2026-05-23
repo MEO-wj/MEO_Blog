@@ -49,14 +49,16 @@ func initGitHubProxy(cfg *config.Config) {
 	}()
 }
 
-func (p *githubProxy) fetchGraphQL(body []byte) ([]byte, int, error) {
+func (p *githubProxy) fetchGraphQL(body []byte, fresh bool) ([]byte, int, error) {
 	hash := sha256.Sum256(body)
 	cacheKey := "gql:" + hex.EncodeToString(hash[:])
 
 	p.mu.RLock()
-	if entry, ok := p.cache[cacheKey]; ok && time.Now().Before(entry.expiresAt) {
-		p.mu.RUnlock()
-		return entry.data, 200, nil
+	if !fresh {
+		if entry, ok := p.cache[cacheKey]; ok && time.Now().Before(entry.expiresAt) {
+			p.mu.RUnlock()
+			return entry.data, 200, nil
+		}
 	}
 	p.mu.RUnlock()
 
@@ -65,6 +67,9 @@ func (p *githubProxy) fetchGraphQL(body []byte) ([]byte, int, error) {
 		return nil, 0, err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	if fresh {
+		req.Header.Set("Cache-Control", "no-cache")
+	}
 	if p.token != "" {
 		req.Header.Set("Authorization", "Bearer "+p.token)
 	}
@@ -89,11 +94,13 @@ func (p *githubProxy) fetchGraphQL(body []byte) ([]byte, int, error) {
 	return buf, resp.StatusCode, nil
 }
 
-func (p *githubProxy) fetch(url string) ([]byte, int, error) {
+func (p *githubProxy) fetch(url string, fresh bool) ([]byte, int, error) {
 	p.mu.RLock()
-	if entry, ok := p.cache[url]; ok && time.Now().Before(entry.expiresAt) {
-		p.mu.RUnlock()
-		return entry.data, 200, nil
+	if !fresh {
+		if entry, ok := p.cache[url]; ok && time.Now().Before(entry.expiresAt) {
+			p.mu.RUnlock()
+			return entry.data, 200, nil
+		}
 	}
 	p.mu.RUnlock()
 
@@ -102,6 +109,9 @@ func (p *githubProxy) fetch(url string) ([]byte, int, error) {
 		return nil, 0, err
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
+	if fresh {
+		req.Header.Set("Cache-Control", "no-cache")
+	}
 	if p.token != "" {
 		req.Header.Set("Authorization", "Bearer "+p.token)
 	}
@@ -162,8 +172,9 @@ func githubUserHandler(cfg *config.Config) http.HandlerFunc {
 
 		userURL := fmt.Sprintf("https://api.github.com/users/%s", username)
 		reposURL := fmt.Sprintf("https://api.github.com/users/%s/repos?sort=updated&per_page=100", username)
+		fresh := r.URL.Query().Get("fresh") == "1"
 
-		userData, userStatus, userErr := ghProxy.fetch(userURL)
+		userData, userStatus, userErr := ghProxy.fetch(userURL, fresh)
 		if userErr != nil {
 			RespondError(w, "GITHUB_FETCH_FAILED", "failed to fetch GitHub data", http.StatusBadGateway)
 			return
@@ -179,7 +190,7 @@ func githubUserHandler(cfg *config.Config) http.HandlerFunc {
 			return
 		}
 
-		reposData, reposStatus, reposErr := ghProxy.fetch(reposURL)
+		reposData, reposStatus, reposErr := ghProxy.fetch(reposURL, fresh)
 		if reposErr != nil {
 			reposData = []byte("[]")
 			reposStatus = 200
@@ -245,7 +256,8 @@ func githubContributionsHandler(cfg *config.Config) http.HandlerFunc {
 			return
 		}
 
-		data, status, fetchErr := ghProxy.fetchGraphQL(body)
+		fresh := r.URL.Query().Get("fresh") == "1"
+		data, status, fetchErr := ghProxy.fetchGraphQL(body, fresh)
 		if fetchErr != nil {
 			RespondError(w, "CONTRIB_FETCH_FAILED", "failed to fetch contributions", http.StatusBadGateway)
 			return

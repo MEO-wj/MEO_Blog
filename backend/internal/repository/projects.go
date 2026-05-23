@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -193,19 +194,20 @@ func UpdateProject(ctx context.Context, db *pgxpool.Pool, id string, u *ProjectU
 }
 
 func ReorderProjects(ctx context.Context, db *pgxpool.Pool, ids []string) error {
-	tx, err := db.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback(ctx)
-
+	// Build VALUES list for single batch UPDATE
+	query := `UPDATE projects SET sort_order = v.sort_order, updated_at = now()
+		FROM (VALUES`
+	args := make([]any, 0, len(ids)*2)
 	for i, id := range ids {
-		if _, err := tx.Exec(ctx, `UPDATE projects SET sort_order = $1, updated_at = now() WHERE id = $2`, i, id); err != nil {
-			return err
+		if i > 0 {
+			query += ","
 		}
+		query += fmt.Sprintf("($%d::uuid, $%d)", i*2+1, i*2+2)
+		args = append(args, id, i)
 	}
-
-	return tx.Commit(ctx)
+	query += `) AS v(id, sort_order) WHERE projects.id = v.id`
+	_, err := db.Exec(ctx, query, args...)
+	return err
 }
 
 func DeleteProject(ctx context.Context, db *pgxpool.Pool, id string) error {

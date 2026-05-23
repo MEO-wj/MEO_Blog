@@ -136,6 +136,12 @@ func computeBlogPostsETag(ctx context.Context, db *pgxpool.Pool) (string, error)
 	return fmt.Sprintf(`W/"blog-posts-%d"`, ts), nil
 }
 
+func computeBlogPostDetailETag(ctx context.Context, db *pgxpool.Pool) (string, error) {
+	// Detail uses same global ETag as list — both invalidate when any post changes.
+	// Separate cache key ensures they don't collide in the 5s in-memory cache.
+	return computeBlogPostsETag(ctx, db)
+}
+
 func computeGuestbookETag(ctx context.Context, db *pgxpool.Pool) (string, error) {
 	var ts int64
 	err := db.QueryRow(ctx,

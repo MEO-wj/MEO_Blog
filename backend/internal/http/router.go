@@ -31,14 +31,14 @@ func NewRouter(cfg *config.Config, db *pgxpool.Pool, rdb *redis.Client) http.Han
 
 		r.With(ETagMiddleware(computeBlogCategoriesETag, db, "blog-cats")).Get("/blog/categories", listBlogCategoriesHandler(db))
 		r.With(ETagMiddleware(computeBlogPostsETag, db, "blog-posts")).Get("/blog/posts", listBlogPostsHandler(db))
-		r.With(ETagMiddleware(computeBlogPostsETag, db, "blog-posts")).Get("/blog/posts/{id}", getBlogPostHandler(db))
+		r.With(ETagMiddleware(computeBlogPostDetailETag, db, "blog-post-detail")).Get("/blog/posts/{id}", getBlogPostHandler(db))
 		r.Get("/blog/posts/{id}/comments", listBlogCommentsHandler(db))
 		r.With(middleware.RateLimit(2, 10)).Post("/blog/posts/{id}/comments", createBlogCommentHandler(db))
 
 		r.With(ETagMiddleware(computeGuestbookETag, db, "guestbook")).Get("/guestbook/messages", listGuestbookMessagesHandler(db))
-		r.With(middleware.RateLimit(2, 10)).Post("/guestbook/messages", createGuestbookMessageHandler(db))
-		r.With(middleware.RateLimit(2, 10)).Post("/guestbook/messages/{id}/replies", userReplyGuestbookHandler(db))
-		r.With(middleware.RateLimit(2, 10)).Delete("/guestbook/messages/{id}", userDeleteGuestbookMessageHandler(db))
+		r.With(middleware.RateLimit(2, 10)).Post("/guestbook/messages", createGuestbookMessageHandler(db, cfg))
+		r.With(middleware.RateLimit(2, 10)).Post("/guestbook/messages/{id}/replies", userReplyGuestbookHandler(db, cfg))
+		r.With(middleware.RateLimit(2, 10)).Delete("/guestbook/messages/{id}", userDeleteGuestbookMessageHandler(db, cfg))
 
 		r.With(ETagMiddleware(computeResumeETag, db, "resume")).Get("/resume", getResumeHandler(db))
 		r.With(ETagMiddleware(computeFavoritesETag, db, "favorites")).Get("/favorites", listFavoritesHandler(db))
@@ -47,7 +47,7 @@ func NewRouter(cfg *config.Config, db *pgxpool.Pool, rdb *redis.Client) http.Han
 		r.Get("/github/{username}/contributions", githubContributionsHandler(cfg))
 
 		r.Group(func(r chi.Router) {
-			r.Use(middleware.RequireAdmin(cfg))
+			r.Use(middleware.RequireAdmin(cfg, rdb))
 
 			r.Get("/admin/profile", getProfileHandler(db))
 			r.Put("/admin/profile", updateProfileHandler(db))

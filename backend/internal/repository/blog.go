@@ -18,6 +18,7 @@ type BlogCategory struct {
 	Icon        string `json:"icon"`
 	Color       string `json:"color"`
 	SortOrder   int    `json:"sortOrder"`
+	PostCount   int    `json:"postCount"`
 	CreatedAt   string `json:"createdAt"`
 	UpdatedAt   string `json:"updatedAt"`
 }
@@ -45,7 +46,7 @@ func scanBlogCategory(row pgx.Row) (*BlogCategory, error) {
 	var createdAt, updatedAt time.Time
 	err := row.Scan(
 		&c.ID, &c.Name, &c.Slug, &c.Description,
-		&c.Icon, &c.Color, &c.SortOrder, &createdAt, &updatedAt,
+		&c.Icon, &c.Color, &c.SortOrder, &c.PostCount, &createdAt, &updatedAt,
 	)
 	if err != nil {
 		return nil, err
@@ -57,10 +58,12 @@ func scanBlogCategory(row pgx.Row) (*BlogCategory, error) {
 
 func ListBlogCategories(ctx context.Context, db *pgxpool.Pool) ([]BlogCategory, error) {
 	rows, err := db.Query(ctx,
-		`SELECT id, name, slug, coalesce(description,''),
-			coalesce(icon,'📖'), coalesce(color,'#24c9f4'),
-			sort_order, created_at, updated_at
-		 FROM blog_categories ORDER BY sort_order ASC, created_at ASC`,
+		`SELECT c.id, c.name, c.slug, coalesce(c.description,''),
+			coalesce(c.icon,'📖'), coalesce(c.color,'#24c9f4'),
+			c.sort_order,
+			(SELECT count(*) FROM posts p WHERE p.category_id = c.id),
+			c.created_at, c.updated_at
+		 FROM blog_categories c ORDER BY c.sort_order ASC, c.created_at ASC`,
 	)
 	if err != nil {
 		return nil, err
@@ -87,7 +90,7 @@ func CreateBlogCategory(ctx context.Context, db *pgxpool.Pool, c *BlogCategoryCr
 		 VALUES ($1, $2, $3, $4, $5, $6)
 		 RETURNING id, name, slug, coalesce(description,''),
 			coalesce(icon,'📖'), coalesce(color,'#24c9f4'),
-			sort_order, created_at, updated_at`,
+			sort_order, 0, created_at, updated_at`,
 		c.Name, c.Slug, c.Description, c.Icon, c.Color, c.SortOrder,
 	))
 }
@@ -105,7 +108,9 @@ func UpdateBlogCategory(ctx context.Context, db *pgxpool.Pool, id string, u *Blo
 		 WHERE id = $7
 		 RETURNING id, name, slug, coalesce(description,''),
 			coalesce(icon,'📖'), coalesce(color,'#24c9f4'),
-			sort_order, created_at, updated_at`,
+			sort_order,
+			(SELECT count(*) FROM posts p WHERE p.category_id = $7),
+			created_at, updated_at`,
 		u.Name, u.Slug, u.Description, u.Icon, u.Color, u.SortOrder, id,
 	))
 }

@@ -2,6 +2,8 @@ package http
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -45,6 +47,46 @@ func initGitHubProxy(cfg *config.Config) {
 			ghProxy.mu.Unlock()
 		}
 	}()
+}
+
+func (p *githubProxy) fetchGraphQL(body []byte) ([]byte, int, error) {
+	hash := sha256.Sum256(body)
+	cacheKey := "gql:" + hex.EncodeToString(hash[:])
+
+	p.mu.RLock()
+	if entry, ok := p.cache[cacheKey]; ok && time.Now().Before(entry.expiresAt) {
+		p.mu.RUnlock()
+		return entry.data, 200, nil
+	}
+	p.mu.RUnlock()
+
+	req, err := http.NewRequest("POST", "https://api.github.com/graphql", bytes.NewReader(body))
+	if err != nil {
+		return nil, 0, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if p.token != "" {
+		req.Header.Set("Authorization", "Bearer "+p.token)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer resp.Body.Close()
+
+	buf, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, resp.StatusCode, err
+	}
+
+	if resp.StatusCode == 200 {
+		p.mu.Lock()
+		p.cache[cacheKey] = githubCacheEntry{data: buf, expiresAt: time.Now().Add(10 * time.Minute)}
+		p.mu.Unlock()
+	}
+
+	return buf, resp.StatusCode, nil
 }
 
 func (p *githubProxy) fetch(url string) ([]byte, int, error) {
@@ -203,31 +245,13 @@ func githubContributionsHandler(cfg *config.Config) http.HandlerFunc {
 			return
 		}
 
-		req, err := http.NewRequest("POST", "https://api.github.com/graphql", bytes.NewReader(body))
-		if err != nil {
-			RespondError(w, "INTERNAL_ERROR", "failed to create request", http.StatusInternalServerError)
-			return
-		}
-		req.Header.Set("Content-Type", "application/json")
-		if ghProxy.token != "" {
-			req.Header.Set("Authorization", "Bearer "+ghProxy.token)
-		}
-
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
+		data, status, fetchErr := ghProxy.fetchGraphQL(body)
+		if fetchErr != nil {
 			RespondError(w, "CONTRIB_FETCH_FAILED", "failed to fetch contributions", http.StatusBadGateway)
 			return
 		}
-		defer resp.Body.Close()
-
-		data, err := io.ReadAll(resp.Body)
-		if err != nil {
-			RespondError(w, "CONTRIB_FETCH_FAILED", "failed to read response", http.StatusBadGateway)
-			return
-		}
-
-		if resp.StatusCode != 200 {
-			RespondError(w, "CONTRIB_API_ERROR", fmt.Sprintf("GitHub GraphQL returned %d", resp.StatusCode), resp.StatusCode)
+		if status != 200 {
+			RespondError(w, "CONTRIB_API_ERROR", fmt.Sprintf("GitHub GraphQL returned %d", status), status)
 			return
 		}
 

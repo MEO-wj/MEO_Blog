@@ -1,6 +1,12 @@
 import type { LayoutItem } from "./types";
 
-const MODEL_CACHE = "meo-blog-model-cache-v2";
+const MODEL_CACHE = "meo-blog-model-cache-v4";
+const MODEL_ASSET_VERSION = "20260524-raw-glb";
+const MODEL_FETCH_CONCURRENCY = 3;
+const MODEL_FETCH_TIMEOUT_MS = 12000;
+const MODEL_BASE_URL = (import.meta.env.VITE_MODEL_BASE_URL ?? "").trim().replace(/\/$/, "");
+let activeModelFetches = 0;
+const modelFetchQueue: Array<() => void> = [];
 
 const PATH_OVERRIDES: Record<string, string> = {
   "ps5-console": "/model/PS5/ps5-console.glb",
@@ -24,39 +30,110 @@ export function resolveAssetPath(item: LayoutItem): string {
     .replace(/^\/public\/models\//, "/model/");
 }
 
-async function fetchWithRetry(url: string, retries = 5): Promise<Response> {
+interface ModelUrlOptions {
+  forceRefresh?: boolean;
+}
+
+function modelCacheKey(assetPath: string): string {
+  const absolute = new URL(assetPath, MODEL_BASE_URL || window.location.origin);
+  absolute.searchParams.set("v", MODEL_ASSET_VERSION);
+  return absolute.toString();
+}
+
+async function fetchWithTimeout(url: string, cache: RequestCache): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), MODEL_FETCH_TIMEOUT_MS);
+
+  try {
+    return await fetch(url, {
+      cache,
+      signal: controller.signal,
+    });
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
+async function fetchWithRetry(url: string, cache: RequestCache, retries = 2): Promise<Response> {
+  let lastError: unknown;
+
   for (let i = 0; i < retries; i++) {
     try {
-      const res = await fetch(url, { cache: "force-cache" });
+      const res = await fetchWithTimeout(url, cache);
       if (res.ok) return res;
+      if (res.status === 404) break;
+      lastError = new Error(`HTTP ${res.status}`);
       if (i < retries - 1) await delay(1000 * Math.pow(2, i));
-    } catch {
+    } catch (err) {
+      lastError = err;
+      if (err instanceof DOMException && err.name === "AbortError" && i === retries - 1) {
+        throw new Error(`Timed out while loading model: ${url}`);
+      }
       if (i < retries - 1) await delay(1000 * Math.pow(2, i));
     }
   }
-  throw new Error(`Failed after ${retries} retries: ${url}`);
+
+  const reason = lastError instanceof Error ? lastError.message : "network request failed";
+  throw new Error(`Failed after ${retries} retries: ${reason}`);
 }
 
 function delay(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-export async function getCachedModelUrl(assetPath: string): Promise<string> {
-  if (!("caches" in window)) return assetPath;
+async function withModelFetchSlot<T>(task: () => Promise<T>): Promise<T> {
+  if (activeModelFetches >= MODEL_FETCH_CONCURRENCY) {
+    await new Promise<void>((resolve) => modelFetchQueue.push(resolve));
+  }
 
-  const absoluteUrl = new URL(assetPath, window.location.origin).toString();
+  activeModelFetches++;
+  try {
+    return await task();
+  } finally {
+    activeModelFetches--;
+    modelFetchQueue.shift()?.();
+  }
+}
+
+export async function evictCachedModel(assetPath: string): Promise<void> {
+  if (!("caches" in window)) return;
   const cache = await caches.open(MODEL_CACHE);
+  await cache.delete(modelCacheKey(assetPath));
+}
+
+export async function getCachedModelUrl(assetPath: string, options: ModelUrlOptions = {}): Promise<string> {
+  const absoluteUrl = modelCacheKey(assetPath);
+
+  if (!("caches" in window)) return absoluteUrl;
+
+  const cache = await caches.open(MODEL_CACHE);
+  if (options.forceRefresh) {
+    await cache.delete(absoluteUrl);
+  }
+
   const cached = await cache.match(absoluteUrl);
 
   if (cached) {
-    return URL.createObjectURL(await cached.blob());
+    const cachedBlob = await cached.blob();
+    if (cachedBlob.size > 0) {
+      return URL.createObjectURL(cachedBlob);
+    }
+    await cache.delete(absoluteUrl);
   }
 
-  const response = await fetchWithRetry(absoluteUrl);
-
-  // Only cache successful responses with actual content
-  if ((response.headers.get("content-length") ?? "0") !== "0") {
-    await cache.put(absoluteUrl, response.clone());
+  const response = await withModelFetchSlot(() =>
+    fetchWithRetry(absoluteUrl, options.forceRefresh ? "reload" : "default"),
+  );
+  const blob = await response.blob();
+  if (blob.size === 0) {
+    throw new Error(`Empty model response: ${assetPath}`);
   }
-  return URL.createObjectURL(await response.blob());
+
+  await cache.put(absoluteUrl, new Response(blob, {
+    headers: {
+      "Content-Type": response.headers.get("Content-Type") ?? "model/gltf-binary",
+      "Cache-Control": "public, max-age=31536000, immutable",
+    },
+  }));
+  return URL.createObjectURL(blob);
 }

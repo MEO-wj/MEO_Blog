@@ -4,14 +4,15 @@ import { useLoader } from "@react-three/fiber";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { MeshoptDecoder } from "meshoptimizer";
 import type { LayoutItem } from "./types";
-import { resolveAssetPath, getCachedModelUrl } from "./modelUtils";
+import { resolveAssetPath, getCachedModelUrl, evictCachedModel } from "./modelUtils";
 import { useSceneStore } from "../stores/sceneStore";
+
+const MAX_MODEL_FETCH_ATTEMPTS = 2;
+const MAX_MODEL_PARSE_ATTEMPTS = 2;
 
 function configureLoader(loader: GLTFLoader) {
   loader.setMeshoptDecoder(MeshoptDecoder);
 }
-
-// --- Error boundary for GLTF parsing failures ---
 
 interface EBState {
   hasError: boolean;
@@ -37,94 +38,98 @@ class ModelErrorBoundary extends Component<
   }
 }
 
-// --- Main component ---
-
 export function ModelItem({ item }: { item: LayoutItem }) {
   const [url, setUrl] = useState<string | null>(null);
-  const [gltfRetryKey, setGltfRetryKey] = useState(0);
-  const [dead, setDead] = useState(false);
+  const [fetchNonce, setFetchNonce] = useState(0);
   const registerModel = useSceneStore((s) => s.registerModel);
   const modelLoaded = useSceneStore((s) => s.modelLoaded);
+  const modelFailed = useSceneStore((s) => s.modelFailed);
+  const modelSkipped = useSceneStore((s) => s.modelSkipped);
+  const clearModelFailure = useSceneStore((s) => s.clearModelFailure);
   const registered = useRef(false);
   const loaded = useRef(false);
+  const parseAttempts = useRef(0);
 
-  // Register exactly once
   useEffect(() => {
     if (!registered.current) {
       registered.current = true;
-      registerModel();
+      registerModel(item.id);
     }
-  }, [registerModel]);
+  }, [item.id, registerModel]);
 
-  // Fetch with retry — do NOT call modelLoaded() on failure
   useEffect(() => {
-    if (dead) return;
     const assetPath = resolveAssetPath(item);
-    let revoked = false;
+    let cancelled = false;
     let blobUrl: string | undefined;
 
     (async () => {
-      const maxRetries = 5;
-      for (let attempt = 0; attempt < maxRetries; attempt++) {
+      let attempt = 0;
+
+      while (!cancelled && attempt < MAX_MODEL_FETCH_ATTEMPTS) {
         try {
-          const resolvedUrl = await getCachedModelUrl(assetPath);
-          if (!revoked) {
-            blobUrl = resolvedUrl;
-            setUrl(resolvedUrl);
+          const resolvedUrl = await getCachedModelUrl(assetPath, {
+            forceRefresh: fetchNonce > 0 || attempt > 0,
+          });
+          if (cancelled) {
+            if (resolvedUrl.startsWith("blob:")) URL.revokeObjectURL(resolvedUrl);
+            return;
           }
-          return; // success
-        } catch {
-          if (revoked) return;
-          if (attempt < maxRetries - 1) {
-            // Exponential backoff: 1s, 2s, 4s, 8s
-            await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, attempt)));
+
+          blobUrl = resolvedUrl;
+          clearModelFailure(item.id);
+          setUrl(resolvedUrl);
+          return;
+        } catch (err) {
+          if (cancelled) return;
+          const message = err instanceof Error ? err.message : "model download failed";
+          attempt++;
+          if (attempt >= MAX_MODEL_FETCH_ATTEMPTS) {
+            modelSkipped(item.id, `${item.label || item.id}: ${message}`);
+            return;
           }
+          modelFailed(item.id, `${item.label || item.id}: ${message}`);
+          const wait = Math.min(1500 * 2 ** attempt, 30000);
+          await new Promise((r) => setTimeout(r, wait));
         }
-      }
-      // All retries exhausted — mark as loaded so overlay doesn't get stuck
-      // but set dead=true so we don't keep retrying
-      if (!revoked && !loaded.current) {
-        loaded.current = true;
-        setDead(true);
-        modelLoaded();
       }
     })();
 
     return () => {
-      revoked = true;
+      cancelled = true;
       if (blobUrl?.startsWith("blob:")) {
         URL.revokeObjectURL(blobUrl);
       }
     };
-  }, [item.id, item.path, modelLoaded, dead]);
+  }, [item, item.id, item.path, fetchNonce, clearModelFailure, modelFailed, modelSkipped]);
 
-  // Called when GLTF parsing succeeds
   const handleModelLoaded = () => {
     if (!loaded.current) {
       loaded.current = true;
-      modelLoaded();
+      parseAttempts.current = 0;
+      clearModelFailure(item.id);
+      modelLoaded(item.id);
     }
   };
 
-  // Called when GLTF parsing fails — retry by bumping key + cache-busting URL
-  const handleGltfError = () => {
-    if (gltfRetryKey < 3) {
-      setGltfRetryKey((k) => k + 1);
-    } else if (!loaded.current) {
-      loaded.current = true;
-      setDead(true);
-      modelLoaded();
+  const handleGltfError = async () => {
+    if (loaded.current) return;
+    const assetPath = resolveAssetPath(item);
+    parseAttempts.current++;
+    if (parseAttempts.current >= MAX_MODEL_PARSE_ATTEMPTS) {
+      modelSkipped(item.id, `${item.label || item.id}: model parse failed`);
+      return;
     }
+    modelFailed(item.id, `${item.label || item.id}: model parse failed, retrying`);
+    await evictCachedModel(assetPath).catch(() => {});
+    setUrl(null);
+    setFetchNonce((value) => value + 1);
   };
 
-  if (!url || dead) return null;
-
-  // Append cache-busting param on retry so useLoader doesn't return stale cached result
-  const retryUrl = gltfRetryKey > 0 ? `${url}#retry=${gltfRetryKey}` : url;
+  if (!url) return null;
 
   return (
-    <ModelErrorBoundary key={gltfRetryKey} onError={handleGltfError}>
-      <LoadedModel url={retryUrl} onLoaded={handleModelLoaded} />
+    <ModelErrorBoundary key={`${item.id}-${fetchNonce}`} onError={handleGltfError}>
+      <LoadedModel url={url} onLoaded={handleModelLoaded} />
     </ModelErrorBoundary>
   );
 }

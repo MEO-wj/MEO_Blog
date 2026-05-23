@@ -43,7 +43,7 @@ func RespondError(w http.ResponseWriter, code string, message string, status int
 	})
 }
 
-var slugRegex = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
+var slugRegex = regexp.MustCompile(`^[a-z0-9\p{Han}]+(?:-[a-z0-9\p{Han}]+)*$`)
 
 func isValidSlug(slug string) bool {
 	return len(slug) > 0 && len(slug) <= 100 && slugRegex.MatchString(slug)

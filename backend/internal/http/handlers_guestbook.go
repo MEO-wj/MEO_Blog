@@ -1,16 +1,44 @@
 package http
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"log/slog"
 	"net"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/meo-blog/backend/internal/config"
 	"github.com/meo-blog/backend/internal/repository"
 )
+
+// Guestbook ownership tokens — HMAC-signed, no IP dependency
+func guestbookSignToken(secret, messageID string) string {
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write([]byte(messageID + "|" + time.Now().UTC().Format("2006-01-02")))
+	return hex.EncodeToString(mac.Sum(nil))
+}
+
+func guestbookVerifyToken(secret, messageID, token string) bool {
+	if token == "" {
+		return false
+	}
+	// Check today and yesterday to handle timezone edge cases
+	for _, day := range []time.Time{time.Now().UTC(), time.Now().UTC().AddDate(0, 0, -1)} {
+		mac := hmac.New(sha256.New, []byte(secret))
+		mac.Write([]byte(messageID + "|" + day.Format("2006-01-02")))
+		expected := hex.EncodeToString(mac.Sum(nil))
+		if hmac.Equal([]byte(token), []byte(expected)) {
+			return true
+		}
+	}
+	return false
+}
 
 func clientIP(r *http.Request) string {
 	if forwardedFor := strings.TrimSpace(r.Header.Get("X-Forwarded-For")); forwardedFor != "" {
@@ -40,7 +68,7 @@ func listGuestbookMessagesHandler(db *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
-func createGuestbookMessageHandler(db *pgxpool.Pool) http.HandlerFunc {
+func createGuestbookMessageHandler(db *pgxpool.Pool, cfg *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
 		var c repository.GuestbookMessageCreate
@@ -69,12 +97,13 @@ func createGuestbookMessageHandler(db *pgxpool.Pool) http.HandlerFunc {
 			RespondError(w, "CREATE_FAILED", "failed to create message", http.StatusInternalServerError)
 			return
 		}
-		RespondOK(w, msg)
+		token := guestbookSignToken(cfg.JWTSecret, msg.ID)
+		RespondOK(w, map[string]any{"message": msg, "ownerToken": token})
 	}
 }
 
 // Public: user reply to a message
-func userReplyGuestbookHandler(db *pgxpool.Pool) http.HandlerFunc {
+func userReplyGuestbookHandler(db *pgxpool.Pool, cfg *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		messageID := chi.URLParam(r, "id")
 		r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
@@ -111,14 +140,18 @@ func userReplyGuestbookHandler(db *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
-// Public: user deletes their own message (IP match)
-func userDeleteGuestbookMessageHandler(db *pgxpool.Pool) http.HandlerFunc {
+// Public: user deletes their own message (token verified)
+func userDeleteGuestbookMessageHandler(db *pgxpool.Pool, cfg *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
-		ip := clientIP(r)
-		if err := repository.DeleteGuestbookOwnMessage(r.Context(), db, id, ip); err != nil {
+		token := r.URL.Query().Get("token")
+		if !guestbookVerifyToken(cfg.JWTSecret, id, token) {
+			RespondError(w, "FORBIDDEN", "invalid ownership token", http.StatusForbidden)
+			return
+		}
+		if err := repository.DeleteGuestbookMessage(r.Context(), db, id); err != nil {
 			slog.Error("delete own guestbook message failed", "error", err, "id", id)
-			RespondError(w, "DELETE_FAILED", "failed to delete message", http.StatusForbidden)
+			RespondError(w, "DELETE_FAILED", "failed to delete message", http.StatusInternalServerError)
 			return
 		}
 		RespondOK(w, map[string]string{"deleted": id})

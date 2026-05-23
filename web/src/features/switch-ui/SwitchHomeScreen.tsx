@@ -133,6 +133,7 @@ export function SwitchHomeScreen({
   const [adminAuthStatus, setAdminAuthStatus] = useState<"idle" | "submitting" | "error">("idle");
   const [adminAuthMessage, setAdminAuthMessage] = useState("");
   const [adminPanelOpen, setAdminPanelOpen] = useState(false);
+  const [sessionChecking, setSessionChecking] = useState(false);
   const [detailProject, setDetailProject] = useState<Project | SwitchHomeProject | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [showGithub, setShowGithub] = useState(false);
@@ -144,26 +145,10 @@ export function SwitchHomeScreen({
 
   const { authenticated: isAdminAuthenticated, setAuthenticated: setAdminAuthenticated, profile, projects: storeProjects, setProjectSummaries, setProfile } = useAdminStore();
 
-  const [dataRetryCount, setDataRetryCount] = useState(0);
-
   useEffect(() => {
     api.getProjectSummaries().then((p) => setProjectSummaries(p)).catch(() => {});
     api.getPublicProfile().then((p) => setProfile(p)).catch(() => {});
-    api.checkSession().then((s) => {
-      if (s.authenticated) setAdminAuthenticated(true);
-    }).catch(() => {});
-  }, [dataRetryCount]);
-
-  // Auto-retry once after 5s if data is still empty
-  useEffect(() => {
-    if (dataRetryCount > 0) return;
-    const t = setTimeout(() => {
-      if (storeProjects.length === 0 && !profile) {
-        setDataRetryCount(1);
-      }
-    }, 5000);
-    return () => clearTimeout(t);
-  }, [dataRetryCount, storeProjects.length, profile]);
+  }, []);
 
   const projectItems = useMemo(() => {
     const source = storeProjects.length > 0 ? storeProjects : switchHomeProjects;
@@ -481,6 +466,29 @@ export function SwitchHomeScreen({
     setAdminAuthMessage("");
   }
 
+  async function openAdminArea() {
+    if (isAdminAuthenticated) {
+      setAdminPanelOpen(true);
+      return;
+    }
+
+    setSessionChecking(true);
+    try {
+      const session = await api.checkSession();
+      if (session.authenticated) {
+        setAdminAuthenticated(true);
+        setAdminPanelOpen(true);
+        return;
+      }
+    } catch {
+      // Fall through to password prompt when the session check is unavailable.
+    } finally {
+      setSessionChecking(false);
+    }
+
+    openAdminPrompt();
+  }
+
   const activateAction = useCallback((actionId: string) => {
     if (!focused) {
       onRequestFocus();
@@ -510,11 +518,8 @@ export function SwitchHomeScreen({
     }
 
     if (actionId === "admin") {
-      if (isAdminAuthenticated) {
-        setAdminPanelOpen(true);
-      } else {
-        openAdminPrompt();
-      }
+      if (sessionChecking) return;
+      void openAdminArea();
       return;
     }
 
@@ -539,7 +544,7 @@ export function SwitchHomeScreen({
     if (routes[actionId]) {
       goToRoute(routes[actionId]);
     }
-  }, [focused, profile?.githubUrl, isAdminAuthenticated, onRequestFocus, onRequestExit]);
+  }, [focused, profile?.githubUrl, isAdminAuthenticated, sessionChecking, onRequestFocus, onRequestExit]);
 
   return (
     <section

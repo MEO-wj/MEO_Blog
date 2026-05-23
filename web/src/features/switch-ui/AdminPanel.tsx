@@ -500,8 +500,16 @@ function ProjectForm({
   const [saving, setSaving] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [pendingIconFile, setPendingIconFile] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const originalRef = useRef<ProjectCreate | null>(null);
+  const pendingIconUrlRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (pendingIconUrlRef.current) URL.revokeObjectURL(pendingIconUrlRef.current);
+    };
+  }, []);
 
   // Load full detail when editing an existing project (form shows summary first)
   useEffect(() => {
@@ -538,10 +546,11 @@ function ProjectForm({
       const { url } = await api.uploadProjectIcon(project.id, file);
       setForm((f) => ({ ...f, iconUrl: url }));
     } else {
-      const reader = new FileReader();
-      reader.onload = () =>
-        setForm((f) => ({ ...f, iconUrl: reader.result as string }));
-      reader.readAsDataURL(file);
+      if (pendingIconUrlRef.current) URL.revokeObjectURL(pendingIconUrlRef.current);
+      const previewUrl = URL.createObjectURL(file);
+      pendingIconUrlRef.current = previewUrl;
+      setPendingIconFile(file);
+      setForm((f) => ({ ...f, iconUrl: previewUrl }));
     }
   }
 
@@ -550,11 +559,13 @@ function ProjectForm({
     if (!form.name) return;
     setSaving(true);
 
+    const optimisticIconUrl = form.iconUrl.startsWith("blob:") ? "" : form.iconUrl;
     const optimisticProject: Project = project
       ? { ...project, ...form, updatedAt: new Date().toISOString() }
       : {
           id: crypto.randomUUID(),
           ...form,
+          iconUrl: optimisticIconUrl,
           coverUrl: "",
           demoUrl: "",
           pinned: false,
@@ -587,10 +598,16 @@ function ProjectForm({
         execute: () => api.updateProject(project.id, patch),
       });
     } else {
+      const createPayload = pendingIconFile ? { ...form, iconUrl: "" } : form;
       saveQueue.enqueue({
         id: optimisticProject.id,
         label: "创建项目",
-        execute: () => api.createProject(form),
+        execute: async () => {
+          const created = await api.createProject(createPayload);
+          if (pendingIconFile) {
+            await api.uploadProjectIcon(created.id, pendingIconFile);
+          }
+        },
         onError: () => onSaveError?.(optimisticProject.id),
       });
     }

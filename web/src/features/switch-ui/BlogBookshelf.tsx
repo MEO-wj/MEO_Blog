@@ -14,6 +14,10 @@ interface BlogBookshelfProps {
 
 type View = "shelf" | "posts" | "reader" | "editor";
 
+function formatBookTitle(name: string) {
+  return Array.from(name.trim()).slice(0, 10).join("");
+}
+
 export function BlogBookshelf({ onClose }: BlogBookshelfProps) {
   const [view, setView] = useState<View>("shelf");
   const [categories, setCategories] = useState<BlogCategory[]>([]);
@@ -219,7 +223,7 @@ function ShelfView({
             <div className="blog-book-spine" />
             <div className="blog-book-cover">
               <span className="blog-book-icon">{cat.icon}</span>
-              <span className="blog-book-title">{cat.name}</span>
+              <span className="blog-book-title" title={cat.name}>{formatBookTitle(cat.name)}</span>
               <span className="blog-book-count">{cat.postCount || 0} 篇</span>
             </div>
             {isAdmin && (

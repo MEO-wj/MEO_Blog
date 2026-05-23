@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../../api/client";
+import { saveQueue } from "../../api/saveQueue";
 import type { Favorite } from "../../api/types";
 import { useAdminStore } from "../../stores/adminStore";
 import { useWheelScroll } from "./useWheelScroll";
@@ -47,13 +48,13 @@ function noticeLayout(index: number, imgW?: number, imgH?: number) {
   const rowH = photoH + 120; // photo + text + padding
 
   // Grid-based placement with jitter for scattered look
-  const cols = 4;
+  const cols = 5;
   const col = index % cols;
   const row = Math.floor(index / cols);
-  const colW = 260;
-  const baseX = 30 + col * colW;
+  const colW = 252;
+  const baseX = 42 + col * colW;
   const baseY = 20 + row * rowH;
-  const jitterX = (r(3) - 0.5) * 60;
+  const jitterX = (r(3) - 0.5) * 70;
   const jitterY = (r(4) - 0.5) * 40;
 
   const x = Math.max(10, baseX + jitterX);
@@ -228,9 +229,10 @@ export function FavoritesModal({ onClose }: FavoritesModalProps) {
       dragRef.current = null;
       setDragId(null);
 
-      // Background save to server
-      api.updateFavoritePosition(d.id, finalX, finalY).catch(() => {
-        console.error("[favorites] background position save failed");
+      saveQueue.enqueue({
+        id: `favorite-position-${d.id}`,
+        label: "保存收藏位置",
+        execute: () => api.updateFavoritePosition(d.id, finalX, finalY),
       });
     }
 
@@ -261,10 +263,13 @@ export function FavoritesModal({ onClose }: FavoritesModalProps) {
     <>
     <aside className="switch-favorites-backdrop" onClick={onClose}>
       <div className="switch-favorites-card" onClick={(e) => e.stopPropagation()}>
+        <div className="switch-favorites-side-post switch-favorites-side-post-left" aria-hidden="true" />
+        <div className="switch-favorites-side-post switch-favorites-side-post-right" aria-hidden="true" />
+
         {/* Wooden plaque header */}
         <div className="switch-favorites-header">
-          <span className="switch-favorites-header-icon">📜</span>
-          <strong>冒险委托板</strong>
+          <span className="switch-favorites-header-icon" aria-hidden="true" />
+          <strong>QUESTS</strong>
           {isAdmin && (
             <>
               <input

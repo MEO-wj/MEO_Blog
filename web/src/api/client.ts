@@ -1,6 +1,19 @@
 import type { APIResponse, AdminProfile, ProfileUpdate, Project, ProjectSummary, ProjectCreate, ProjectUpdate, GHUser, GHRepo, GHContributions, BlogCategory, BlogCategoryCreate, BlogPost, BlogPostCreate, BlogPostUpdate, BlogComment, BlogCommentCreate, GuestbookMessage, GuestbookMessageCreate, GuestbookReplyCreate, Favorite } from "./types";
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? "/api/v1";
+const GET_TIMEOUT_MS = 12000;
+const MUTATION_TIMEOUT_MS = 30000;
+const UPLOAD_TIMEOUT_MS = 120000;
+
+class RequestFailure extends Error {
+  retryable: boolean;
+
+  constructor(message: string, retryable: boolean) {
+    super(message);
+    this.name = "RequestFailure";
+    this.retryable = retryable;
+  }
+}
 
 // --- Request deduplication (GET only) ---
 const inflight = new Map<string, Promise<unknown>>();
@@ -117,6 +130,35 @@ async function request<T>(path: string, init?: RequestInit, retries = 2, cacheMs
   return promise;
 }
 
+function requestTimeoutMs(method: string, init?: RequestInit): number {
+  if (init?.body instanceof FormData) return UPLOAD_TIMEOUT_MS;
+  if (method === "GET") return GET_TIMEOUT_MS;
+  return MUTATION_TIMEOUT_MS;
+}
+
+function isRetryableStatus(status: number): boolean {
+  return status === 408 || status === 429 || status >= 500;
+}
+
+async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, {
+      ...init,
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new RequestFailure("request timed out", true);
+    }
+    throw err;
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
 async function fetchAndCache<T>(
   cacheKey: string,
   path: string,
@@ -125,13 +167,16 @@ async function fetchAndCache<T>(
   retries: number,
   cacheMs?: number,
 ): Promise<T> {
+  const method = (init?.method ?? "GET").toUpperCase();
+  const timeoutMs = requestTimeoutMs(method, init);
+
   for (let i = 0; i <= retries; i++) {
     try {
-      const res = await fetch(`${BASE_URL}${path}`, {
+      const res = await fetchWithTimeout(`${BASE_URL}${path}`, {
         credentials: "include",
         ...init,
         headers,
-      });
+      }, timeoutMs);
 
       // Handle 304 Not Modified — data unchanged, refresh cache timestamp
       if (res.status === 304) {
@@ -148,9 +193,20 @@ async function fetchAndCache<T>(
       try {
         json = await res.json();
       } catch {
-        throw new Error(`server returned ${res.status} ${res.statusText}`);
+        throw new RequestFailure(
+          `server returned ${res.status} ${res.statusText}`,
+          isRetryableStatus(res.status),
+        );
       }
-      if (json.error) throw new Error(json.error.message);
+      if (json.error) {
+        throw new RequestFailure(json.error.message, isRetryableStatus(res.status));
+      }
+      if (!res.ok) {
+        throw new RequestFailure(
+          `server returned ${res.status} ${res.statusText}`,
+          isRetryableStatus(res.status),
+        );
+      }
 
       // Store data and ETag from response
       if (cacheMs) {
@@ -159,7 +215,8 @@ async function fetchAndCache<T>(
       }
       return json.data;
     } catch (err) {
-      if (i === retries) throw err;
+      const retryable = err instanceof RequestFailure ? err.retryable : true;
+      if (!retryable || i === retries) throw err;
       await new Promise((r) => setTimeout(r, 1000 * (i + 1)));
     }
   }
@@ -175,7 +232,7 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ password, sequence }),
     }),
-  checkSession: () => request<{ authenticated: boolean }>("/admin/session", undefined, 2, 2 * 60 * 1000),
+  checkSession: () => request<{ authenticated: boolean }>("/admin/session", undefined, 0, 2 * 60 * 1000),
   logout: () => {
     invalidateCache("GET:/admin/session");
     return request<{ loggedOut: boolean }>("/admin/logout", { method: "POST" });
@@ -269,9 +326,9 @@ export const api = {
 
   // GitHub (public, proxied through backend)
   getGithubUser: (username: string) =>
-    request<{ user: GHUser; repos: GHRepo[] }>(`/github/${username}`, undefined, 2, 15 * 60 * 1000),
+    request<{ user: GHUser; repos: GHRepo[] }>(`/github/${username}?fresh=1`, undefined, 2, 0),
   getGithubContributions: (username: string) =>
-    request<GHContributions>(`/github/${username}/contributions`, undefined, 2, 15 * 60 * 1000),
+    request<GHContributions>(`/github/${username}/contributions?fresh=1`, undefined, 2, 0),
 
   // Blog (public)
   getBlogCategories: () => request<BlogCategory[]>("/blog/categories", undefined, 2, 10 * 60 * 1000),

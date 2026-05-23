@@ -1,6 +1,10 @@
+import { lazy, Suspense } from "react";
 import { Html } from "@react-three/drei";
 import * as THREE from "three";
-import { SwitchHomeScreen } from "../features/switch-ui/SwitchHomeScreen";
+
+const SwitchHomeScreen = lazy(() =>
+  import("../features/switch-ui/SwitchHomeScreen").then((m) => ({ default: m.SwitchHomeScreen })),
+);
 
 interface SwitchScreenOverlayProps {
   focused: boolean;
@@ -16,6 +20,25 @@ const DOCK_HIT_POSITION: [number, number, number] = [-3.75, 4.76, -7.66];
 
 function setPointerCursor(cursor: string) {
   document.body.style.cursor = cursor;
+}
+
+function SwitchScreenFallback() {
+  return (
+    <div
+      style={{
+        width: 1280,
+        height: 720,
+        display: "grid",
+        placeItems: "center",
+        color: "#63e6be",
+        background: "#1c1c1c",
+        fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+        letterSpacing: 4,
+      }}
+    >
+      MEO_Blog
+    </div>
+  );
 }
 
 export function SwitchScreenOverlay({
@@ -44,13 +67,15 @@ export function SwitchScreenOverlay({
           }}
           style={{ cursor: focused ? "default" : "zoom-in" }}
         >
-          <SwitchHomeScreen
-            focused={focused}
-            resetSignal={resetSignal}
-            presentation="preview"
-            onRequestFocus={onRequestFocus}
-            onRequestExit={onRequestExit}
-          />
+          <Suspense fallback={<SwitchScreenFallback />}>
+            <SwitchHomeScreen
+              focused={focused}
+              resetSignal={resetSignal}
+              presentation="preview"
+              onRequestFocus={onRequestFocus}
+              onRequestExit={onRequestExit}
+            />
+          </Suspense>
         </div>
       </Html>
 

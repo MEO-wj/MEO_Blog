@@ -92,7 +92,7 @@ function SceneCamera({
 }
 
 export function SceneEntry() {
-  const { layout } = useSceneLayout();
+  const { layout, error: layoutError } = useSceneLayout();
   const [screenFocused, setScreenFocused] = useState(false);
   const [screenResetSignal, setScreenResetSignal] = useState(0);
   function openScreen() {
@@ -116,9 +116,10 @@ export function SceneEntry() {
     : [2.0, 5.8, 0.25] as [number, number, number];
 
   return (
-    <div className="w-full h-full relative">
-      <LoadingOverlay />
+    <div className="w-full h-full relative" style={{ width: "100%", height: "100%", position: "relative" }}>
+      <LoadingOverlay layoutReady={layout !== null} layoutError={layoutError} />
       <Canvas
+        dpr={[1, 1.5]}
         shadows
         camera={{ fov: DESKTOP_FOV, near: 0.1, far: 240, position: cameraPos }}
         gl={{ antialias: true, powerPreference: "high-performance" }}

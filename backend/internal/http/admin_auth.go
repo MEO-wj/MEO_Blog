@@ -7,15 +7,14 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"net"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/meo-blog/backend/internal/auth"
 	"github.com/meo-blog/backend/internal/config"
 	"github.com/redis/go-redis/v9"
 )
@@ -30,13 +29,6 @@ type adminLoginRequest struct {
 	Sequence string `json:"sequence"`
 }
 
-type adminSessionClaims struct {
-	Subject string `json:"sub"`
-	Issued  int64  `json:"iat"`
-	Expires int64  `json:"exp"`
-	Nonce   string `json:"nonce"`
-}
-
 type adminLoginAttempt struct {
 	Failures    int
 	LockedUntil time.Time
@@ -47,6 +39,24 @@ var adminLoginAttempts = struct {
 	byIP map[string]adminLoginAttempt
 }{
 	byIP: map[string]adminLoginAttempt{},
+}
+
+func init() {
+	// Evict expired lockout entries every 5 minutes to prevent unbounded growth
+	go func() {
+		ticker := time.NewTicker(5 * time.Minute)
+		defer ticker.Stop()
+		for range ticker.C {
+			adminLoginAttempts.Lock()
+			now := time.Now()
+			for ip, attempt := range adminLoginAttempts.byIP {
+				if !attempt.LockedUntil.IsZero() && now.After(attempt.LockedUntil) {
+					delete(adminLoginAttempts.byIP, ip)
+				}
+			}
+			adminLoginAttempts.Unlock()
+		}
+	}()
 }
 
 func adminLoginHandler(cfg *config.Config) http.HandlerFunc {
@@ -107,13 +117,13 @@ func adminLoginHandler(cfg *config.Config) http.HandlerFunc {
 func adminSessionHandler(cfg *config.Config, rdb *redis.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie(adminSessionCookieName)
-		if err != nil || !verifyAdminSession(cfg.JWTSecret, cookie.Value) {
+		if err != nil || !auth.VerifySession(cfg.JWTSecret, cookie.Value) {
 			RespondError(w, "ADMIN_SESSION_INVALID", "invalid admin session", http.StatusUnauthorized)
 			return
 		}
 
 		// Check if token has been revoked
-		if isTokenBlacklisted(r.Context(), rdb, cookie.Value) {
+		if auth.IsTokenBlacklisted(r.Context(), rdb, cookie.Value) {
 			RespondError(w, "ADMIN_SESSION_INVALID", "invalid admin session", http.StatusUnauthorized)
 			return
 		}
@@ -148,16 +158,11 @@ func adminLogoutHandler(cfg *config.Config, rdb *redis.Client) http.HandlerFunc 
 	}
 }
 
-func tokenHash(token string) string {
-	h := sha256.Sum256([]byte(token))
-	return hex.EncodeToString(h[:])
-}
-
 func blacklistToken(ctx context.Context, rdb *redis.Client, secret, token string) {
 	if rdb == nil {
 		return
 	}
-	claims, err := decodeAdminSession(token)
+	claims, err := auth.DecodeSessionClaims(token)
 	if err != nil {
 		return
 	}
@@ -165,33 +170,8 @@ func blacklistToken(ctx context.Context, rdb *redis.Client, secret, token string
 	if ttl <= 0 {
 		return
 	}
-	key := "admin:blacklist:" + tokenHash(token)
+	key := "admin:blacklist:" + auth.TokenHash(token)
 	rdb.Set(ctx, key, "1", ttl)
-}
-
-func isTokenBlacklisted(ctx context.Context, rdb *redis.Client, token string) bool {
-	if rdb == nil {
-		return false
-	}
-	key := "admin:blacklist:" + tokenHash(token)
-	exists, err := rdb.Exists(ctx, key).Result()
-	return err == nil && exists > 0
-}
-
-func decodeAdminSession(token string) (*adminSessionClaims, error) {
-	parts := strings.Split(token, ".")
-	if len(parts) != 2 {
-		return nil, fmt.Errorf("invalid token format")
-	}
-	payload, err := base64.RawURLEncoding.DecodeString(parts[0])
-	if err != nil {
-		return nil, err
-	}
-	var claims adminSessionClaims
-	if err := json.Unmarshal(payload, &claims); err != nil {
-		return nil, err
-	}
-	return &claims, nil
 }
 
 func secretMatches(input, expected string) bool {
@@ -249,6 +229,11 @@ func adminLoginLocked(clientIP string) (time.Time, bool) {
 
 	attempt := adminLoginAttempts.byIP[clientIP]
 	if attempt.LockedUntil.IsZero() || time.Now().After(attempt.LockedUntil) {
+		// Lockout expired — reset failure count so one more failure
+		// doesn't immediately re-lock
+		if attempt.Failures > 0 {
+			delete(adminLoginAttempts.byIP, clientIP)
+		}
 		return time.Time{}, false
 	}
 
@@ -280,7 +265,7 @@ func signAdminSession(secret string, expiresAt time.Time) (string, error) {
 		return "", err
 	}
 
-	claims := adminSessionClaims{
+	claims := auth.SessionClaims{
 		Subject: "admin",
 		Issued:  time.Now().Unix(),
 		Expires: expiresAt.Unix(),
@@ -298,30 +283,4 @@ func signAdminSession(secret string, expiresAt time.Time) (string, error) {
 	signature := base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
 
 	return encodedPayload + "." + signature, nil
-}
-
-func verifyAdminSession(secret, token string) bool {
-	parts := strings.Split(token, ".")
-	if len(parts) != 2 {
-		return false
-	}
-
-	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write([]byte(parts[0]))
-	expectedSignature := base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
-	if subtle.ConstantTimeCompare([]byte(parts[1]), []byte(expectedSignature)) != 1 {
-		return false
-	}
-
-	payload, err := base64.RawURLEncoding.DecodeString(parts[0])
-	if err != nil {
-		return false
-	}
-
-	var claims adminSessionClaims
-	if err := json.Unmarshal(payload, &claims); err != nil {
-		return false
-	}
-
-	return claims.Subject == "admin" && time.Now().Unix() < claims.Expires
 }

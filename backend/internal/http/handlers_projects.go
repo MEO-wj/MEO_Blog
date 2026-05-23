@@ -66,6 +66,8 @@ func createProjectHandler(db *pgxpool.Pool) http.HandlerFunc {
 			RespondError(w, "CREATE_FAILED", "failed to create project", http.StatusInternalServerError)
 			return
 		}
+		InvalidateETagCache("projects")
+		InvalidateETagCache("project-detail")
 		RespondOK(w, project)
 	}
 }
@@ -88,6 +90,8 @@ func updateProjectHandler(db *pgxpool.Pool) http.HandlerFunc {
 			RespondError(w, "UPDATE_FAILED", "failed to update project", http.StatusInternalServerError)
 			return
 		}
+		InvalidateETagCache("projects")
+		InvalidateETagCache("project-detail")
 		RespondOK(w, project)
 	}
 }
@@ -111,6 +115,8 @@ func adminReorderProjectsHandler(db *pgxpool.Pool) http.HandlerFunc {
 			RespondError(w, "REORDER_FAILED", "failed to reorder projects", http.StatusInternalServerError)
 			return
 		}
+		InvalidateETagCache("projects")
+		InvalidateETagCache("project-detail")
 		RespondOK(w, map[string]string{"status": "ok"})
 	}
 }
@@ -127,6 +133,8 @@ func deleteProjectHandler(db *pgxpool.Pool, cfg *config.Config) http.HandlerFunc
 			filename := strings.TrimPrefix(iconURL, "/uploads/")
 			os.Remove(filepath.Join(cfg.UploadDir, filename))
 		}
+		InvalidateETagCache("projects")
+		InvalidateETagCache("project-detail")
 		RespondOK(w, map[string]string{"deleted": id})
 	}
 }

@@ -29,7 +29,11 @@ var allowedMimeTypes = map[string]string{
 
 func uploadAvatarHandler(db *pgxpool.Pool, cfg *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		url, err := handleFileUpload(r, cfg, 5<<20)
+		url, err := handleFileUploadWithOptions(r, cfg, uploadOptions{
+			maxBytes:     5 << 20,
+			maxDimension: 512,
+			jpegQuality:  82,
+		})
 		if err != nil {
 			RespondError(w, "UPLOAD_FAILED", err.Error(), http.StatusBadRequest)
 			return
@@ -38,6 +42,8 @@ func uploadAvatarHandler(db *pgxpool.Pool, cfg *config.Config) http.HandlerFunc 
 			RespondError(w, "UPDATE_FAILED", "failed to update avatar", http.StatusInternalServerError)
 			return
 		}
+		InvalidateETagCache("profile")
+		InvalidateETagCache("resume")
 		RespondOK(w, map[string]string{"url": url})
 	}
 }
@@ -45,7 +51,11 @@ func uploadAvatarHandler(db *pgxpool.Pool, cfg *config.Config) http.HandlerFunc 
 func uploadProjectIconHandler(db *pgxpool.Pool, cfg *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
-		url, err := handleFileUpload(r, cfg, 2<<20)
+		url, err := handleFileUploadWithOptions(r, cfg, uploadOptions{
+			maxBytes:     2 << 20,
+			maxDimension: 640,
+			jpegQuality:  82,
+		})
 		if err != nil {
 			RespondError(w, "UPLOAD_FAILED", err.Error(), http.StatusBadRequest)
 			return
@@ -59,13 +69,36 @@ func uploadProjectIconHandler(db *pgxpool.Pool, cfg *config.Config) http.Handler
 			oldFile := strings.TrimPrefix(oldIcon, "/uploads/")
 			os.Remove(filepath.Join(cfg.UploadDir, oldFile))
 		}
+		InvalidateETagCache("projects")
+		InvalidateETagCache("project-detail")
 		RespondOK(w, map[string]string{"url": url})
 	}
 }
 
+type uploadOptions struct {
+	maxBytes     int64
+	maxDimension int
+	jpegQuality  int
+}
+
 func handleFileUpload(r *http.Request, cfg *config.Config, maxSize int64) (string, error) {
-	r.Body = http.MaxBytesReader(nil, r.Body, maxSize)
-	if err := r.ParseMultipartForm(maxSize); err != nil {
+	return handleFileUploadWithOptions(r, cfg, uploadOptions{
+		maxBytes:     maxSize,
+		maxDimension: 2048,
+		jpegQuality:  80,
+	})
+}
+
+func handleFileUploadWithOptions(r *http.Request, cfg *config.Config, opts uploadOptions) (string, error) {
+	if opts.maxDimension <= 0 {
+		opts.maxDimension = 2048
+	}
+	if opts.jpegQuality <= 0 {
+		opts.jpegQuality = 80
+	}
+
+	r.Body = http.MaxBytesReader(nil, r.Body, opts.maxBytes)
+	if err := r.ParseMultipartForm(opts.maxBytes); err != nil {
 		return "", fmt.Errorf("file too large or invalid form")
 	}
 
@@ -94,7 +127,7 @@ func handleFileUpload(r *http.Request, cfg *config.Config, maxSize int64) (strin
 		if err != nil {
 			return "", fmt.Errorf("failed to read file")
 		}
-		compressed, newExt, err := compressImage(data, ext)
+		compressed, newExt, err := compressImage(data, ext, opts.maxDimension, opts.jpegQuality)
 		if err == nil && len(compressed) < len(data) {
 			// Use compressed version if smaller
 			oldPath := destPath
@@ -120,10 +153,8 @@ func handleFileUpload(r *http.Request, cfg *config.Config, maxSize int64) (strin
 	return "/uploads/" + filename, nil
 }
 
-const maxDimension = 2048
-
 // compressImage decodes a raster image, resizes if too large, and re-encodes as JPEG.
-func compressImage(data []byte, ext string) ([]byte, string, error) {
+func compressImage(data []byte, ext string, maxDimension int, jpegQuality int) ([]byte, string, error) {
 	src, _, err := image.Decode(bytes.NewReader(data))
 	if err != nil {
 		return nil, "", err

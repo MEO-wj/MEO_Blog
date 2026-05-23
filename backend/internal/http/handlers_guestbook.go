@@ -97,6 +97,7 @@ func createGuestbookMessageHandler(db *pgxpool.Pool, cfg *config.Config) http.Ha
 			RespondError(w, "CREATE_FAILED", "failed to create message", http.StatusInternalServerError)
 			return
 		}
+		InvalidateETagCache("guestbook")
 		token := guestbookSignToken(cfg.JWTSecret, msg.ID)
 		RespondOK(w, map[string]any{"message": msg, "ownerToken": token})
 	}
@@ -136,6 +137,7 @@ func userReplyGuestbookHandler(db *pgxpool.Pool, cfg *config.Config) http.Handle
 			RespondError(w, "CREATE_FAILED", "failed to create reply", http.StatusInternalServerError)
 			return
 		}
+		InvalidateETagCache("guestbook")
 		RespondOK(w, reply)
 	}
 }
@@ -154,6 +156,7 @@ func userDeleteGuestbookMessageHandler(db *pgxpool.Pool, cfg *config.Config) htt
 			RespondError(w, "DELETE_FAILED", "failed to delete message", http.StatusInternalServerError)
 			return
 		}
+		InvalidateETagCache("guestbook")
 		RespondOK(w, map[string]string{"deleted": id})
 	}
 }
@@ -179,6 +182,7 @@ func adminReplyGuestbookHandler(db *pgxpool.Pool) http.HandlerFunc {
 			RespondError(w, "CREATE_FAILED", "failed to create reply", http.StatusInternalServerError)
 			return
 		}
+		InvalidateETagCache("guestbook")
 		RespondOK(w, reply)
 	}
 }
@@ -191,6 +195,7 @@ func adminDeleteGuestbookMessageHandler(db *pgxpool.Pool) http.HandlerFunc {
 			RespondError(w, "DELETE_FAILED", "failed to delete message", http.StatusInternalServerError)
 			return
 		}
+		InvalidateETagCache("guestbook")
 		RespondOK(w, map[string]string{"deleted": id})
 	}
 }
@@ -203,6 +208,7 @@ func adminDeleteGuestbookReplyHandler(db *pgxpool.Pool) http.HandlerFunc {
 			RespondError(w, "DELETE_FAILED", "failed to delete reply", http.StatusInternalServerError)
 			return
 		}
+		InvalidateETagCache("guestbook")
 		RespondOK(w, map[string]string{"deleted": id})
 	}
 }

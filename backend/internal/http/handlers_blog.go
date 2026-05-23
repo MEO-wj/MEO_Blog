@@ -133,6 +133,9 @@ func adminCreateBlogCategoryHandler(db *pgxpool.Pool) http.HandlerFunc {
 			RespondError(w, "CREATE_FAILED", "failed to create category", http.StatusInternalServerError)
 			return
 		}
+		InvalidateETagCache("blog-cats")
+		InvalidateETagCache("blog-posts")
+		InvalidateETagCache("blog-post-detail")
 		RespondOK(w, category)
 	}
 }
@@ -155,6 +158,9 @@ func adminUpdateBlogCategoryHandler(db *pgxpool.Pool) http.HandlerFunc {
 			RespondError(w, "UPDATE_FAILED", "failed to update category", http.StatusInternalServerError)
 			return
 		}
+		InvalidateETagCache("blog-cats")
+		InvalidateETagCache("blog-posts")
+		InvalidateETagCache("blog-post-detail")
 		RespondOK(w, category)
 	}
 }
@@ -166,6 +172,9 @@ func adminDeleteBlogCategoryHandler(db *pgxpool.Pool) http.HandlerFunc {
 			RespondError(w, "DELETE_FAILED", "failed to delete category", http.StatusInternalServerError)
 			return
 		}
+		InvalidateETagCache("blog-cats")
+		InvalidateETagCache("blog-posts")
+		InvalidateETagCache("blog-post-detail")
 		RespondOK(w, map[string]string{"deleted": id})
 	}
 }
@@ -192,6 +201,9 @@ func adminCreateBlogPostHandler(db *pgxpool.Pool) http.HandlerFunc {
 			RespondError(w, "CREATE_FAILED", "failed to create post", http.StatusInternalServerError)
 			return
 		}
+		InvalidateETagCache("blog-posts")
+		InvalidateETagCache("blog-post-detail")
+		InvalidateETagCache("blog-cats")
 		RespondOK(w, post)
 	}
 }
@@ -214,6 +226,9 @@ func adminUpdateBlogPostHandler(db *pgxpool.Pool) http.HandlerFunc {
 			RespondError(w, "UPDATE_FAILED", "failed to update post", http.StatusInternalServerError)
 			return
 		}
+		InvalidateETagCache("blog-posts")
+		InvalidateETagCache("blog-post-detail")
+		InvalidateETagCache("blog-cats")
 		RespondOK(w, post)
 	}
 }
@@ -225,6 +240,9 @@ func adminDeleteBlogPostHandler(db *pgxpool.Pool) http.HandlerFunc {
 			RespondError(w, "DELETE_FAILED", "failed to delete post", http.StatusInternalServerError)
 			return
 		}
+		InvalidateETagCache("blog-posts")
+		InvalidateETagCache("blog-post-detail")
+		InvalidateETagCache("blog-cats")
 		RespondOK(w, map[string]string{"deleted": id})
 	}
 }

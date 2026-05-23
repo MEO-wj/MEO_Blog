@@ -71,25 +71,25 @@ func ETagMiddleware(fn etagFn, db *pgxpool.Pool, cacheKey string) func(http.Hand
 }
 
 func computeProjectsETag(ctx context.Context, db *pgxpool.Pool) (string, error) {
-	var ts int64
+	var count, ts int64
 	err := db.QueryRow(ctx,
-		`SELECT COALESCE(EXTRACT(EPOCH FROM max(updated_at))::bigint, 0) FROM projects`,
-	).Scan(&ts)
+		`SELECT count(*), COALESCE(EXTRACT(EPOCH FROM max(updated_at))::bigint, 0) FROM projects`,
+	).Scan(&count, &ts)
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf(`W/"projects-%d"`, ts), nil
+	return fmt.Sprintf(`W/"projects-%d-%d"`, count, ts), nil
 }
 
 func computeProjectDetailETag(ctx context.Context, db *pgxpool.Pool) (string, error) {
-	var ts int64
+	var count, ts int64
 	err := db.QueryRow(ctx,
-		`SELECT COALESCE(EXTRACT(EPOCH FROM max(updated_at))::bigint, 0) FROM projects`,
-	).Scan(&ts)
+		`SELECT count(*), COALESCE(EXTRACT(EPOCH FROM max(updated_at))::bigint, 0) FROM projects`,
+	).Scan(&count, &ts)
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf(`W/"project-detail-%d"`, ts), nil
+	return fmt.Sprintf(`W/"project-detail-%d-%d"`, count, ts), nil
 }
 
 func computeProfileETag(ctx context.Context, db *pgxpool.Pool) (string, error) {
@@ -104,36 +104,40 @@ func computeProfileETag(ctx context.Context, db *pgxpool.Pool) (string, error) {
 }
 
 func computeFavoritesETag(ctx context.Context, db *pgxpool.Pool) (string, error) {
-	var ts int64
+	var count, ts int64
+	var fingerprint string
 	err := db.QueryRow(ctx,
-		`SELECT COALESCE(EXTRACT(EPOCH FROM max(created_at))::bigint, 0) FROM favorites`,
-	).Scan(&ts)
+		`SELECT count(*),
+			COALESCE(EXTRACT(EPOCH FROM max(created_at))::bigint, 0),
+			COALESCE(md5(string_agg(id::text || ':' || COALESCE(pos_x::text, '') || ':' || COALESCE(pos_y::text, ''), ',' ORDER BY id)), '')
+		 FROM favorites`,
+	).Scan(&count, &ts, &fingerprint)
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf(`W/"favorites-%d"`, ts), nil
+	return fmt.Sprintf(`W/"favorites-%d-%d-%s"`, count, ts, fingerprint), nil
 }
 
 func computeBlogCategoriesETag(ctx context.Context, db *pgxpool.Pool) (string, error) {
-	var ts int64
+	var count, ts int64
 	err := db.QueryRow(ctx,
-		`SELECT COALESCE(EXTRACT(EPOCH FROM max(updated_at))::bigint, 0) FROM blog_categories`,
-	).Scan(&ts)
+		`SELECT count(*), COALESCE(EXTRACT(EPOCH FROM max(updated_at))::bigint, 0) FROM blog_categories`,
+	).Scan(&count, &ts)
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf(`W/"blog-cats-%d"`, ts), nil
+	return fmt.Sprintf(`W/"blog-cats-%d-%d"`, count, ts), nil
 }
 
 func computeBlogPostsETag(ctx context.Context, db *pgxpool.Pool) (string, error) {
-	var ts int64
+	var count, ts int64
 	err := db.QueryRow(ctx,
-		`SELECT COALESCE(EXTRACT(EPOCH FROM max(updated_at))::bigint, 0) FROM posts`,
-	).Scan(&ts)
+		`SELECT count(*), COALESCE(EXTRACT(EPOCH FROM max(updated_at))::bigint, 0) FROM posts`,
+	).Scan(&count, &ts)
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf(`W/"blog-posts-%d"`, ts), nil
+	return fmt.Sprintf(`W/"blog-posts-%d-%d"`, count, ts), nil
 }
 
 func computeBlogPostDetailETag(ctx context.Context, db *pgxpool.Pool) (string, error) {
@@ -143,14 +147,14 @@ func computeBlogPostDetailETag(ctx context.Context, db *pgxpool.Pool) (string, e
 }
 
 func computeGuestbookETag(ctx context.Context, db *pgxpool.Pool) (string, error) {
-	var ts int64
+	var count, ts int64
 	err := db.QueryRow(ctx,
-		`SELECT COALESCE(EXTRACT(EPOCH FROM max(created_at))::bigint, 0) FROM guestbook_messages`,
-	).Scan(&ts)
+		`SELECT count(*), COALESCE(EXTRACT(EPOCH FROM max(created_at))::bigint, 0) FROM guestbook_messages`,
+	).Scan(&count, &ts)
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf(`W/"guestbook-%d"`, ts), nil
+	return fmt.Sprintf(`W/"guestbook-%d-%d"`, count, ts), nil
 }
 
 func computeResumeETag(ctx context.Context, db *pgxpool.Pool) (string, error) {

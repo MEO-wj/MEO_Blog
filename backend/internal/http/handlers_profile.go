@@ -38,6 +38,8 @@ func updateProfileHandler(db *pgxpool.Pool) http.HandlerFunc {
 			RespondError(w, "UPDATE_FAILED", "failed to update profile", http.StatusInternalServerError)
 			return
 		}
+		InvalidateETagCache("profile")
+		InvalidateETagCache("resume")
 		profile, err := repository.GetProfile(r.Context(), db)
 		if err != nil {
 			RespondError(w, "PROFILE_NOT_FOUND", "profile not found", http.StatusNotFound)
@@ -143,7 +145,11 @@ func getResumeHandler(db *pgxpool.Pool) http.HandlerFunc {
 // Admin: upload resume image
 func uploadResumeHandler(db *pgxpool.Pool, cfg *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		url, err := handleFileUpload(r, cfg, 10<<20)
+		url, err := handleFileUploadWithOptions(r, cfg, uploadOptions{
+			maxBytes:     10 << 20,
+			maxDimension: 1600,
+			jpegQuality:  82,
+		})
 		if err != nil {
 			RespondError(w, "UPLOAD_FAILED", err.Error(), http.StatusBadRequest)
 			return
@@ -152,6 +158,8 @@ func uploadResumeHandler(db *pgxpool.Pool, cfg *config.Config) http.HandlerFunc 
 			RespondError(w, "UPDATE_FAILED", "failed to update resume", http.StatusInternalServerError)
 			return
 		}
+		InvalidateETagCache("profile")
+		InvalidateETagCache("resume")
 		RespondOK(w, map[string]string{"url": url})
 	}
 }

@@ -36,7 +36,11 @@ func listFavoritesHandler(db *pgxpool.Pool) http.HandlerFunc {
 
 func adminCreateFavoriteHandler(db *pgxpool.Pool, cfg *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		url, err := handleFileUpload(r, cfg, 10<<20)
+		url, err := handleFileUploadWithOptions(r, cfg, uploadOptions{
+			maxBytes:     10 << 20,
+			maxDimension: 1600,
+			jpegQuality:  78,
+		})
 		if err != nil {
 			RespondError(w, "UPLOAD_FAILED", err.Error(), http.StatusBadRequest)
 			return
@@ -65,6 +69,7 @@ func adminCreateFavoriteHandler(db *pgxpool.Pool, cfg *config.Config) http.Handl
 			RespondError(w, "CREATE_FAILED", "failed to create favorite", http.StatusInternalServerError)
 			return
 		}
+		InvalidateETagCache("favorites")
 		RespondOK(w, fav)
 	}
 }
@@ -82,6 +87,7 @@ func adminDeleteFavoriteHandler(db *pgxpool.Pool, cfg *config.Config) http.Handl
 			oldFile := strings.TrimPrefix(oldImage, "/uploads/")
 			os.Remove(filepath.Join(cfg.UploadDir, oldFile))
 		}
+		InvalidateETagCache("favorites")
 		RespondOK(w, map[string]string{"deleted": id})
 	}
 }
@@ -104,6 +110,7 @@ func adminUpdateFavoritePositionHandler(db *pgxpool.Pool) http.HandlerFunc {
 			RespondError(w, "UPDATE_FAILED", "failed to update position", http.StatusInternalServerError)
 			return
 		}
+		InvalidateETagCache("favorites")
 		RespondOK(w, map[string]string{"updated": id})
 	}
 }

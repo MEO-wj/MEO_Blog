@@ -6,6 +6,8 @@ interface SaveJob {
   status: SaveStatus;
   execute: () => Promise<unknown>;
   retryCount: number;
+  onComplete?: () => void;
+  onError?: (err: unknown) => void;
 }
 
 const MAX_RETRIES = 3;
@@ -33,12 +35,14 @@ async function processJob(job: SaveJob) {
         job.status = 'saved';
         job.retryCount = attempt;
         notify();
+        job.onComplete?.();
         setTimeout(() => {
           jobs.delete(job.id);
           notify();
         }, 2000);
         return;
-      } catch {
+      } catch (err) {
+        console.error(`[saveQueue] ${job.label} attempt ${attempt + 1} failed:`, err);
         job.retryCount = attempt + 1;
         notify();
         if (attempt < MAX_RETRIES) {
@@ -48,19 +52,22 @@ async function processJob(job: SaveJob) {
     }
     job.status = 'failed';
     notify();
+    job.onError?.(new Error('save failed after retries'));
   } finally {
     processing.delete(job.id);
   }
 }
 
 export const saveQueue = {
-  enqueue(opts: { id: string; label: string; execute: () => Promise<unknown> }): string {
+  enqueue(opts: { id: string; label: string; execute: () => Promise<unknown>; onComplete?: () => void; onError?: (err: unknown) => void }): string {
     const job: SaveJob = {
       id: opts.id,
       label: opts.label,
       status: 'saving',
       execute: opts.execute,
       retryCount: 0,
+      onComplete: opts.onComplete,
+      onError: opts.onError,
     };
     jobs.set(job.id, job);
     notify();

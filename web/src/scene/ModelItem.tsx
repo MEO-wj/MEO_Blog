@@ -106,12 +106,11 @@ export function ModelItem({ item }: { item: LayoutItem }) {
     }
   };
 
-  // Called when GLTF parsing fails — retry by bumping key
+  // Called when GLTF parsing fails — retry by bumping key + cache-busting URL
   const handleGltfError = () => {
     if (gltfRetryKey < 3) {
       setGltfRetryKey((k) => k + 1);
     } else if (!loaded.current) {
-      // Exhausted GLTF retries — give up and count as loaded
       loaded.current = true;
       setDead(true);
       modelLoaded();
@@ -120,9 +119,12 @@ export function ModelItem({ item }: { item: LayoutItem }) {
 
   if (!url || dead) return null;
 
+  // Append cache-busting param on retry so useLoader doesn't return stale cached result
+  const retryUrl = gltfRetryKey > 0 ? `${url}#retry=${gltfRetryKey}` : url;
+
   return (
     <ModelErrorBoundary key={gltfRetryKey} onError={handleGltfError}>
-      <LoadedModel url={url} onLoaded={handleModelLoaded} />
+      <LoadedModel url={retryUrl} onLoaded={handleModelLoaded} />
     </ModelErrorBoundary>
   );
 }

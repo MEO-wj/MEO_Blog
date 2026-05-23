@@ -64,12 +64,29 @@ function noticeLayout(index: number, imgW?: number, imgH?: number) {
   return { rotation, width, photoH, x, y, z, hasSeal };
 }
 
-interface DragState {
-  id: string;
-  offsetX: number;
-  offsetY: number;
-  currentX: number;
-  currentY: number;
+const FAV_POS_KEY = "favorites_positions";
+
+function loadPositions(): Record<string, { x: number; y: number }> {
+  try {
+    const raw = localStorage.getItem(FAV_POS_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function savePositions(positions: Record<string, { x: number; y: number }>) {
+  try {
+    localStorage.setItem(FAV_POS_KEY, JSON.stringify(positions));
+  } catch { /* quota exceeded */ }
+}
+
+function mergeWithPositions(favs: Favorite[], positions: Record<string, { x: number; y: number }>): Favorite[] {
+  return favs.map((f) => {
+    const pos = positions[f.id];
+    if (pos) return { ...f, posX: pos.x, posY: pos.y };
+    return f;
+  });
 }
 
 export function FavoritesModal({ onClose }: FavoritesModalProps) {
@@ -79,7 +96,8 @@ export function FavoritesModal({ onClose }: FavoritesModalProps) {
   const [retryCount, setRetryCount] = useState(0);
   const [uploading, setUploading] = useState(false);
   const [selectedImage, setSelectedImage] = useState<Favorite | null>(null);
-  const [drag, setDrag] = useState<DragState | null>(null);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const dragRef = useRef<{ id: string; offsetX: number; offsetY: number; el: HTMLElement } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useWheelScroll<HTMLDivElement>();
   const boardRef = useRef<HTMLDivElement>(null);
@@ -87,10 +105,12 @@ export function FavoritesModal({ onClose }: FavoritesModalProps) {
   const { authenticated: isAdmin } = useAdminStore();
 
   useEffect(() => {
+    const positions = loadPositions();
     setLoading(true);
     setError(null);
     api.getFavorites().then((f) => {
-      setFavorites(f);
+      const merged = mergeWithPositions(f, positions);
+      setFavorites(merged);
       setLoading(false);
     }).catch(() => {
       setLoading(false);
@@ -123,8 +143,8 @@ export function FavoritesModal({ onClose }: FavoritesModalProps) {
     }
   }
 
-  // Drag handlers
-  const handleMouseDown = useCallback((e: React.MouseEvent, fav: Favorite) => {
+  // Drag handlers — use refs + direct DOM transform to avoid React batching issues
+  const handleMouseDown = useCallback((e: React.MouseEvent, fav: Favorite, el: HTMLElement) => {
     if (!isAdmin || e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
@@ -136,57 +156,92 @@ export function FavoritesModal({ onClose }: FavoritesModalProps) {
     const favX = fav.posX ?? layout.x;
     const favY = fav.posY ?? layout.y;
     const boardRect = board.getBoundingClientRect();
-    const scrollEl = scrollRef.current;
 
-    setDrag({
+    // Record mouse offset from the notice's top-left corner
+    dragRef.current = {
       id: fav.id,
-      offsetX: e.clientX - boardRect.left - (scrollEl ? scrollEl.scrollLeft : 0) - favX,
-      offsetY: e.clientY - boardRect.top - (scrollEl ? scrollEl.scrollTop : 0) - favY,
-      currentX: favX,
-      currentY: favY,
-    });
-  }, [isAdmin, favorites, scrollRef]);
+      offsetX: e.clientX - boardRect.left - favX,
+      offsetY: e.clientY - boardRect.top - favY,
+      el,
+    };
+    el.style.transform = "rotate(0deg) scale(1.05)";
+    setDragId(fav.id);
+  }, [isAdmin, favorites]);
 
   useEffect(() => {
-    if (!drag) return;
+    if (!dragId) return;
 
-    const board = boardRef.current;
-    if (!board) return;
+    let rafId = 0;
+    let lastMouseEvent: MouseEvent | null = null;
 
     function onMouseMove(e: MouseEvent) {
-      const boardRect = board!.getBoundingClientRect();
-      const scrollEl = scrollRef.current;
-      const newX = e.clientX - boardRect.left - (scrollEl ? scrollEl.scrollLeft : 0) - drag!.offsetX;
-      const newY = e.clientY - boardRect.top - (scrollEl ? scrollEl.scrollTop : 0) - drag!.offsetY;
-      setDrag((d) => d ? { ...d, currentX: Math.max(0, newX), currentY: Math.max(0, newY) } : null);
+      lastMouseEvent = e;
+      if (!rafId) {
+        rafId = requestAnimationFrame(() => {
+          rafId = 0;
+          const d = dragRef.current;
+          if (!d) return;
+          const ev = lastMouseEvent!;
+          const boardRect = boardRef.current!.getBoundingClientRect();
+          // Calculate target position relative to board
+          const targetX = Math.max(0, ev.clientX - boardRect.left - d.offsetX);
+          const targetY = Math.max(0, ev.clientY - boardRect.top - d.offsetY);
+          // Get current base position from favorites state
+          const fav = favorites.find((f) => f.id === d.id);
+          const baseX = fav?.posX ?? 0;
+          const baseY = fav?.posY ?? 0;
+          // Apply as transform offset — does not fight with React's left/top
+          const dx = targetX - baseX;
+          const dy = targetY - baseY;
+          d.el.style.transform = `translate(${dx}px, ${dy}px) rotate(0deg) scale(1.05)`;
+        });
+      }
     }
 
-    async function onMouseUp() {
-      const finalX = Math.round(drag!.currentX);
-      const finalY = Math.round(drag!.currentY);
-      const favId = drag!.id;
-      setDrag(null);
+    function onMouseUp() {
+      const d = dragRef.current;
+      if (!d) return;
 
-      // Update local state immediately
-      setFavorites((prev) =>
-        prev.map((f) => f.id === favId ? { ...f, posX: finalX, posY: finalY } : f)
-      );
+      // Read final position from transform
+      const fav = favorites.find((f) => f.id === d.id);
+      const baseX = fav?.posX ?? 0;
+      const baseY = fav?.posY ?? 0;
+      const match = d.el.style.transform.match(/translate\(([^,]+)px,\s*([^)]+)px\)/);
+      const dx = match ? parseFloat(match[1]) : 0;
+      const dy = match ? parseFloat(match[2]) : 0;
+      const finalX = Math.round(baseX + dx);
+      const finalY = Math.round(baseY + dy);
 
-      // Persist to server
-      try {
-        await api.updateFavoritePosition(favId, finalX, finalY);
-      } catch {
-        // ignore — position stays in local state
-      }
+      // Update state first so React renders the new left/top immediately
+      setFavorites((prev) => {
+        const updated = prev.map((f) => f.id === d.id ? { ...f, posX: finalX, posY: finalY } : f);
+        const positions: Record<string, { x: number; y: number }> = {};
+        for (const f of updated) {
+          if (f.posX != null && f.posY != null) positions[f.id] = { x: f.posX, y: f.posY };
+        }
+        savePositions(positions);
+        return updated;
+      });
+
+      // Clear drag state — React will now render with new posX/posY
+      d.el.style.transform = "";
+      dragRef.current = null;
+      setDragId(null);
+
+      // Background save to server
+      api.updateFavoritePosition(d.id, finalX, finalY).catch(() => {
+        console.error("[favorites] background position save failed");
+      });
     }
 
     window.addEventListener("mousemove", onMouseMove);
     window.addEventListener("mouseup", onMouseUp);
     return () => {
+      cancelAnimationFrame(rafId);
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseup", onMouseUp);
     };
-  }, [drag, scrollRef]);
+  }, [dragId, favorites]);
 
   // Calculate board min-height based on item positions
   const boardHeight = favorites.length > 0
@@ -203,6 +258,7 @@ export function FavoritesModal({ onClose }: FavoritesModalProps) {
     : 700;
 
   return (
+    <>
     <aside className="switch-favorites-backdrop" onClick={onClose}>
       <div className="switch-favorites-card" onClick={(e) => e.stopPropagation()}>
         {/* Wooden plaque header */}
@@ -261,9 +317,9 @@ export function FavoritesModal({ onClose }: FavoritesModalProps) {
             <div ref={boardRef} className="switch-favorites-board" style={{ minHeight: boardHeight }}>
               {favorites.map((fav, index) => {
                 const layout = noticeLayout(index, fav.width, fav.height);
-                const isDragging = drag?.id === fav.id;
-                const x = isDragging ? drag!.currentX : (fav.posX ?? layout.x);
-                const y = isDragging ? drag!.currentY : (fav.posY ?? layout.y);
+                const isDragging = dragId === fav.id;
+                const x = fav.posX ?? layout.x;
+                const y = fav.posY ?? layout.y;
                 return (
                   <div
                     key={fav.id}
@@ -278,7 +334,7 @@ export function FavoritesModal({ onClose }: FavoritesModalProps) {
                       animationDelay: isDragging ? undefined : `${index * 0.08}s`,
                     } as React.CSSProperties}
                     onClick={() => { if (!isDragging) setSelectedImage(fav); }}
-                    onMouseDown={(e) => handleMouseDown(e, fav)}
+                    onMouseDown={(e) => handleMouseDown(e, fav, e.currentTarget)}
                   >
                     {/* Iron nail */}
                     <div className="switch-favorites-nail" />
@@ -333,5 +389,6 @@ export function FavoritesModal({ onClose }: FavoritesModalProps) {
         )}
       </div>
     </aside>
+    </>
   );
 }

@@ -157,6 +157,7 @@ export interface BlogCategory {
   icon: string;
   color: string;
   sortOrder: number;
+  postCount: number;
   createdAt: string;
   updatedAt: string;
 }

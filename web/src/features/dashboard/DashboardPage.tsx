@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { api } from "../../api/client";
 
 export function DashboardPage() {
   const navigate = useNavigate();
@@ -8,26 +9,17 @@ export function DashboardPage() {
   useEffect(() => {
     let cancelled = false;
 
-    async function verifyAdminSession() {
-      try {
-        const response = await fetch("/api/v1/admin/session", {
-          credentials: "include",
-        });
-
-        if (!response.ok) {
-          navigate("/", { replace: true });
-          return;
-        }
-
-        if (!cancelled) {
+    api.checkSession().then((s) => {
+      if (!cancelled) {
+        if (s.authenticated) {
           setChecking(false);
+        } else {
+          navigate("/", { replace: true });
         }
-      } catch {
-        navigate("/", { replace: true });
       }
-    }
-
-    verifyAdminSession();
+    }).catch(() => {
+      if (!cancelled) navigate("/", { replace: true });
+    });
 
     return () => {
       cancelled = true;

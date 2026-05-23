@@ -1,6 +1,7 @@
-import { useEffect, useState, type FormEvent } from "react";
-import Markdown from "react-markdown";
+import { lazy, Suspense, useEffect, useState, type FormEvent } from "react";
 import remarkGfm from "remark-gfm";
+
+const Markdown = lazy(() => import("react-markdown"));
 import { api } from "../../api/client";
 import { saveQueue } from "../../api/saveQueue";
 import type { BlogCategory, BlogCategoryCreate, BlogPost, BlogPostCreate, BlogComment } from "../../api/types";
@@ -27,18 +28,32 @@ export function BlogBookshelf({ onClose }: BlogBookshelfProps) {
 
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [postSaveSignal, setPostSaveSignal] = useState(0);
 
   useEffect(() => {
-    setLoading(true);
-    setError(null);
-    api.getBlogCategories().then((c) => {
-      setCategories(c);
+    if (categories.length === 0) setLoading(true);
+    // Fetch categories + all posts to compute postCount client-side
+    Promise.all([
+      api.getBlogCategoriesFresh(),
+      api.getBlogPosts(),
+    ]).then(([c, posts]) => {
+      const countMap: Record<string, number> = {};
+      for (const p of posts) {
+        countMap[p.categoryId] = (countMap[p.categoryId] ?? 0) + 1;
+      }
+      const withCount = c.map((cat) => ({ ...cat, postCount: cat.postCount || countMap[cat.id] || 0 }));
+      setCategories(withCount);
       setLoading(false);
+      setError(null);
     }).catch(() => {
       setLoading(false);
       setError("加载失败，请检查网络");
     });
-  }, [retryCount]);
+  }, [retryCount, postSaveSignal]);
+
+  function handleSaveComplete() {
+    setPostSaveSignal((s) => s + 1);
+  }
 
   function handleSelectCategory(cat: BlogCategory) {
     setSelectedCategory(cat);
@@ -141,6 +156,7 @@ export function BlogBookshelf({ onClose }: BlogBookshelfProps) {
               onBack={handleBack}
               onCreate={handleCreatePost}
               isAdmin={isAdmin}
+              refreshSignal={postSaveSignal}
             />
           )}
           {view === "reader" && selectedPost && (
@@ -157,6 +173,7 @@ export function BlogBookshelf({ onClose }: BlogBookshelfProps) {
               defaultCategoryId={selectedCategory?.id ?? ""}
               onBack={handleBack}
               onSaved={handlePostSaved}
+              onSaveComplete={handleSaveComplete}
             />
           )}
         </div>
@@ -186,20 +203,6 @@ function ShelfView({
   onCategorySaved: (c: BlogCategory) => void;
   onCancelCreate: () => void;
 }) {
-  const [postCounts, setPostCounts] = useState<Record<string, number>>({});
-
-  useEffect(() => {
-    api.getBlogPosts().then((posts) => {
-      const counts: Record<string, number> = {};
-      for (const p of posts) {
-        if (p.categoryId) {
-          counts[p.categoryId] = (counts[p.categoryId] || 0) + 1;
-        }
-      }
-      setPostCounts(counts);
-    }).catch(() => {});
-  }, []);
-
   return (
     <div className="blog-shelf-view">
       <div className="blog-shelf">
@@ -217,7 +220,7 @@ function ShelfView({
             <div className="blog-book-cover">
               <span className="blog-book-icon">{cat.icon}</span>
               <span className="blog-book-title">{cat.name}</span>
-              <span className="blog-book-count">{postCounts[cat.id] || 0} 篇</span>
+              <span className="blog-book-count">{cat.postCount || 0} 篇</span>
             </div>
             {isAdmin && (
               <button
@@ -225,7 +228,7 @@ function ShelfView({
                 onClick={(e) => {
                   e.stopPropagation();
                   if (confirm(`确定删除分类"${cat.name}"？`)) {
-                    api.deleteBlogCategory(cat.id).then(() => onDeleteCategory(cat.id));
+                    api.deleteBlogCategory(cat.id).then(() => onDeleteCategory(cat.id)).catch(() => alert("删除失败"));
                   }
                 }}
               >
@@ -371,6 +374,7 @@ function PostsView({
   onBack,
   onCreate,
   isAdmin,
+  refreshSignal,
 }: {
   category: BlogCategory;
   onSelect: (p: BlogPost) => void;
@@ -378,6 +382,7 @@ function PostsView({
   onBack: () => void;
   onCreate: () => void;
   isAdmin: boolean;
+  refreshSignal: number;
 }) {
   const [posts, setPosts] = useState<BlogPost[]>([]);
   const [loading, setLoading] = useState(true);
@@ -388,13 +393,13 @@ function PostsView({
       setPosts(p);
       setLoading(false);
     }).catch(() => setLoading(false));
-  }, [category.slug, isAdmin]);
+  }, [category.slug, isAdmin, refreshSignal]);
 
   function handleDelete(id: string) {
     if (!confirm("确定删除此文章？")) return;
     api.deleteBlogPost(id).then(() => {
       setPosts((prev) => prev.filter((p) => p.id !== id));
-    });
+    }).catch(() => alert("删除失败"));
   }
 
   function formatDate(s: string | null) {
@@ -466,8 +471,16 @@ function ReaderView({
   onBack: () => void;
   isAdmin: boolean;
 }) {
+  const [fullPost, setFullPost] = useState<BlogPost>(post);
   const [comments, setComments] = useState<BlogComment[]>([]);
   const [loadingComments, setLoadingComments] = useState(true);
+
+  // Fetch full post content (list API omits content_md for efficiency)
+  useEffect(() => {
+    api.getBlogPost(post.id).then((p) => {
+      setFullPost(p);
+    }).catch(() => {});
+  }, [post.id]);
 
   useEffect(() => {
     api.getBlogComments(post.id).then((c) => {
@@ -494,16 +507,18 @@ function ReaderView({
     <div className="blog-reader">
       <div className="blog-reader-header">
         <button className="blog-back-btn" onClick={onBack}>← 返回</button>
-        <h2>{post.title}</h2>
+        <h2>{fullPost.title}</h2>
       </div>
       <div className="blog-scroll-content">
         <div className="blog-scroll-ornament-top" />
         <div className="blog-scroll-body">
           <div className="blog-scroll-meta">
-            {post.publishedAt && <span>发布于 {formatDate(post.publishedAt)}</span>}
+            {fullPost.publishedAt && <span>发布于 {formatDate(fullPost.publishedAt)}</span>}
           </div>
           <div className="blog-markdown">
-            <Markdown remarkPlugins={[remarkGfm]}>{post.contentMd}</Markdown>
+            <Suspense fallback={<div style={{color:"#8a9bbd",padding:20}}>加载中...</div>}>
+              <Markdown remarkPlugins={[remarkGfm]}>{fullPost.contentMd}</Markdown>
+            </Suspense>
           </div>
         </div>
         <div className="blog-scroll-ornament-bottom" />
@@ -522,7 +537,7 @@ function ReaderView({
                 <button
                   className="blog-comment-delete"
                   onClick={() => {
-                    api.deleteBlogComment(post.id, c.id).then(() => handleCommentDeleted(c.id));
+                    api.deleteBlogComment(post.id, c.id).then(() => handleCommentDeleted(c.id)).catch(() => alert("删除失败"));
                   }}
                 >
                   删除
@@ -608,12 +623,14 @@ function PostEditor({
   defaultCategoryId,
   onBack,
   onSaved,
+  onSaveComplete,
 }: {
   post: BlogPost | null;
   categories: BlogCategory[];
   defaultCategoryId: string;
   onBack: () => void;
   onSaved: () => void;
+  onSaveComplete?: () => void;
 }) {
   const [form, setForm] = useState<BlogPostCreate>({
     slug: post?.slug ?? "",
@@ -625,6 +642,14 @@ function PostEditor({
     categoryId: post?.categoryId ?? defaultCategoryId,
   });
   const [saving, setSaving] = useState(false);
+
+  // Fetch full post content when editing (list API omits contentMd)
+  useEffect(() => {
+    if (!post) return;
+    api.getBlogPost(post.id).then((full) => {
+      setForm((f) => ({ ...f, contentMd: full.contentMd }));
+    }).catch(() => {});
+  }, [post?.id]);
 
   function autoSlug(title: string) {
     return title
@@ -638,17 +663,20 @@ function PostEditor({
     if (!form.title || !form.slug) return;
     setSaving(true);
     const jobId = crypto.randomUUID();
+
     if (post) {
       saveQueue.enqueue({
         id: jobId,
         label: "保存文章",
         execute: () => api.updateBlogPost(post.id, form),
+        onComplete: () => onSaveComplete?.(),
       });
     } else {
       saveQueue.enqueue({
         id: jobId,
         label: "创建文章",
         execute: () => api.createBlogPost(form),
+        onComplete: () => onSaveComplete?.(),
       });
     }
     setSaving(false);

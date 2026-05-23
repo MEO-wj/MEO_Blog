@@ -295,10 +295,14 @@ function ProjectManager({ onSave }: { onSave: (p: ProjectSummary[]) => void }) {
 
   async function handleDelete(id: string) {
     if (!confirm("确定删除此项目？")) return;
-    await api.deleteProject(id);
-    const updated = projects.filter((p) => p.id !== id);
-    setProjects(updated);
-    onSave(updated);
+    try {
+      await api.deleteProject(id);
+      const updated = projects.filter((p) => p.id !== id);
+      setProjects(updated);
+      onSave(updated);
+    } catch {
+      alert("删除失败，请重试");
+    }
   }
 
   function handleEdit(p: ProjectSummary) {
@@ -403,6 +407,11 @@ function ProjectManager({ onSave }: { onSave: (p: ProjectSummary[]) => void }) {
           setCreating(false);
         }}
         onSaved={handleSaved}
+        onSaveError={(id) => {
+          const updated = projects.filter((p) => p.id !== id);
+          setProjects(updated);
+          onSave(updated);
+        }}
       />
     );
   }
@@ -465,10 +474,12 @@ function ProjectForm({
   project,
   onCancel,
   onSaved,
+  onSaveError,
 }: {
   project: Project | null;
   onCancel: () => void;
   onSaved: (p: Project) => void;
+  onSaveError?: (id: string) => void;
 }) {
   const [form, setForm] = useState<ProjectCreate>(() => {
     const initial = {
@@ -580,6 +591,7 @@ function ProjectForm({
         id: optimisticProject.id,
         label: "创建项目",
         execute: () => api.createProject(form),
+        onError: () => onSaveError?.(optimisticProject.id),
       });
     }
 
@@ -776,11 +788,21 @@ function TechStackPicker({
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    const CACHE_KEY = "tech-stack-icons-v1";
+    try {
+      const cached = localStorage.getItem(CACHE_KEY);
+      if (cached) {
+        setIcons(JSON.parse(cached));
+        searchRef.current?.focus();
+        return;
+      }
+    } catch { /* ignore */ }
     fetch("/icons/tech-stack/devicon.json")
       .then((r) => r.json())
       .then((data: DeviconEntry[]) => {
         const withOriginal = data.filter((d) => d.versions.svg.includes("original"));
         setIcons(withOriginal);
+        try { localStorage.setItem(CACHE_KEY, JSON.stringify(withOriginal)); } catch { /* quota */ }
       })
       .catch(() => {});
     searchRef.current?.focus();

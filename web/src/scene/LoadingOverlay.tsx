@@ -13,7 +13,10 @@ export function LoadingOverlay() {
   const ready = iconsReady || allLoaded;
   const progress = totalModels > 0 ? Math.min(100, Math.round((loadedModels / totalModels) * 100)) : 0;
 
-  readyRef.current = ready;
+  // Update ref in effect, not during render (React 18 concurrent mode safe)
+  useEffect(() => {
+    readyRef.current = ready;
+  }, [ready]);
 
   // Min 1.5s display
   useEffect(() => {

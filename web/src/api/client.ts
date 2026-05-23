@@ -47,8 +47,8 @@ function refreshCacheTimestamp(key: string): void {
   }
 }
 
-export function invalidateCache(path: string): void {
-  const prefix = `cache:${path}`;
+export function invalidateCache(cacheKey: string): void {
+  const prefix = `cache:${cacheKey}`;
   localStorage.removeItem(prefix);
   // Also remove entries with query params (e.g. /blog/posts clears /blog/posts?category=x)
   const keysToRemove: string[] = [];
@@ -78,14 +78,22 @@ async function request<T>(path: string, init?: RequestInit, retries = 2, cacheMs
   const method = (init?.method ?? "GET").toUpperCase();
   const cacheKey = `${method}:${path}`;
 
+  // cacheMs === 0: bypass cache and dedup entirely (fresh fetch)
+  if (cacheMs === 0 && method === "GET") {
+    return fetchAndCache<T>(cacheKey, path, init, headers, retries);
+  }
+
   // Return from cache immediately + background refresh (stale-while-revalidate)
   if (cacheMs && method === "GET") {
     const cached = getCache(cacheKey, cacheMs);
     if (cached !== null) {
-      // Pass ETag for conditional request
-      if (cached.etag) headers["If-None-Match"] = cached.etag;
-      // Fire network request in background to refresh cache
-      fetchAndCache<T>(cacheKey, path, init, headers, retries).catch(() => {});
+      // Deduplicate background refresh — reuse in-flight request if exists
+      if (!inflight.has(cacheKey)) {
+        if (cached.etag) headers["If-None-Match"] = cached.etag;
+        const bgPromise = fetchAndCache<T>(cacheKey, path, init, headers, retries).catch(() => {});
+        inflight.set(cacheKey, bgPromise);
+        bgPromise.finally(() => inflight.delete(cacheKey));
+      }
       return cached.data as T;
     }
   }
@@ -136,7 +144,12 @@ async function fetchAndCache<T>(
         continue;
       }
 
-      const json: APIResponse<T> = await res.json();
+      let json: APIResponse<T>;
+      try {
+        json = await res.json();
+      } catch {
+        throw new Error(`server returned ${res.status} ${res.statusText}`);
+      }
       if (json.error) throw new Error(json.error.message);
 
       // Store data and ETag from response
@@ -262,9 +275,10 @@ export const api = {
 
   // Blog (public)
   getBlogCategories: () => request<BlogCategory[]>("/blog/categories", undefined, 2, 10 * 60 * 1000),
+  getBlogCategoriesFresh: () => request<BlogCategory[]>("/blog/categories", undefined, 2, 0),
   getBlogPosts: (categorySlug?: string) =>
     request<BlogPost[]>(`/blog/posts${categorySlug ? `?category=${categorySlug}` : ""}`, undefined, 2, 5 * 60 * 1000),
-  getBlogPost: (id: string) => request<BlogPost>(`/blog/posts/${id}`, undefined, 2, 10 * 60 * 1000),
+  getBlogPost: (id: string) => request<BlogPost>(`/blog/posts/${id}`, undefined, 2, 0),
   getBlogComments: (postId: string) => request<BlogComment[]>(`/blog/posts/${postId}/comments`, undefined, 2, 2 * 60 * 1000),
   createBlogComment: async (postId: string, data: BlogCommentCreate) => {
     const result = await request<BlogComment>(`/blog/posts/${postId}/comments`, {
@@ -394,10 +408,15 @@ export const api = {
     invalidateCache("GET:/favorites");
   },
   updateFavoritePosition: async (id: string, posX: number | null, posY: number | null) => {
-    await request<void>(`/admin/favorites/${id}/position`, {
-      method: "PATCH",
-      body: JSON.stringify({ posX, posY }),
-    });
-    invalidateCache("GET:/favorites");
+    try {
+      await request<void>(`/admin/favorites/${id}/position`, {
+        method: "PATCH",
+        body: JSON.stringify({ posX, posY }),
+      });
+      invalidateCache("GET:/favorites");
+    } catch (err) {
+      console.error("[updateFavoritePosition] save failed:", err);
+      throw err;
+    }
   },
 };

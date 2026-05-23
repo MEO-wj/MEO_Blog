@@ -4366,6 +4366,7 @@
   z-index: 9999 !important;
   opacity: 0.9;
   transition: none;
+  animation: none;
   pointer-events: none;
 }
 

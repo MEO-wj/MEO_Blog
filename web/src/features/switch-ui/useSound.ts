@@ -21,6 +21,17 @@ function getAudio(name: string): HTMLAudioElement {
   return audioCache[name];
 }
 
+// Release all cached audio on page unload
+if (typeof window !== "undefined") {
+  window.addEventListener("beforeunload", () => {
+    for (const key of Object.keys(audioCache)) {
+      audioCache[key].pause();
+      audioCache[key].src = "";
+      delete audioCache[key];
+    }
+  });
+}
+
 export function useSound() {
   const lastPlayRef = useRef<Record<string, number>>({});
 

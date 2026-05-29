@@ -17,8 +17,8 @@ export function LoadingOverlay({ layoutReady, layoutError }: LoadingOverlayProps
   const minTimerDone = useRef(false);
   const readyRef = useRef(false);
 
-  const settledModels = loadedModels + skippedModels;
-  const allModelsSettled = layoutReady && totalModels > 0 && settledModels >= totalModels && failedModels === 0;
+  const settledModels = loadedModels + skippedModels + failedModels;
+  const allModelsSettled = layoutReady && totalModels > 0 && settledModels >= totalModels;
   const ready = allModelsSettled && iconsReady;
   const progress = totalModels > 0 ? Math.min(100, Math.round((settledModels / totalModels) * 100)) : 0;
   const activeError = layoutReady ? lastError : layoutError;

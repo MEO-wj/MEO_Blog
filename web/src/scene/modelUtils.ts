@@ -2,8 +2,9 @@ import type { LayoutItem } from "./types";
 
 const MODEL_CACHE = "meo-blog-model-cache-v4";
 const MODEL_ASSET_VERSION = "20260524-raw-glb";
-const MODEL_FETCH_CONCURRENCY = 3;
-const MODEL_FETCH_TIMEOUT_MS = 12000;
+const MODEL_FETCH_CONCURRENCY = 2;
+const MODEL_FETCH_TIMEOUT_MS = 20000;
+const MODEL_BLOB_READ_TIMEOUT_MS = 15000;
 const MODEL_BASE_URL = (import.meta.env.VITE_MODEL_BASE_URL ?? "").trim().replace(/\/$/, "");
 let activeModelFetches = 0;
 const modelFetchQueue: Array<() => void> = [];
@@ -81,6 +82,19 @@ function delay(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+function readBlobWithTimeout(source: Response | Blob, timeoutMs: number): Promise<Blob> {
+  // If source is already a Blob (from Cache API), just return it
+  if (source instanceof Blob) return Promise.resolve(source);
+
+  return new Promise<Blob>((resolve, reject) => {
+    const timeoutId = setTimeout(() => reject(new Error("blob read timed out")), timeoutMs);
+    source.blob().then(
+      (blob) => { clearTimeout(timeoutId); resolve(blob); },
+      (err) => { clearTimeout(timeoutId); reject(err); },
+    );
+  });
+}
+
 async function withModelFetchSlot<T>(task: () => Promise<T>): Promise<T> {
   if (activeModelFetches >= MODEL_FETCH_CONCURRENCY) {
     await new Promise<void>((resolve) => modelFetchQueue.push(resolve));
@@ -114,7 +128,7 @@ export async function getCachedModelUrl(assetPath: string, options: ModelUrlOpti
   const cached = await cache.match(absoluteUrl);
 
   if (cached) {
-    const cachedBlob = await cached.blob();
+    const cachedBlob = await readBlobWithTimeout(cached, MODEL_BLOB_READ_TIMEOUT_MS);
     if (cachedBlob.size > 0) {
       return URL.createObjectURL(cachedBlob);
     }
@@ -124,7 +138,7 @@ export async function getCachedModelUrl(assetPath: string, options: ModelUrlOpti
   const response = await withModelFetchSlot(() =>
     fetchWithRetry(absoluteUrl, options.forceRefresh ? "reload" : "default"),
   );
-  const blob = await response.blob();
+  const blob = await readBlobWithTimeout(response, MODEL_BLOB_READ_TIMEOUT_MS);
   if (blob.size === 0) {
     throw new Error(`Empty model response: ${assetPath}`);
   }

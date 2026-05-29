@@ -7,7 +7,7 @@ import type { LayoutItem } from "./types";
 import { resolveAssetPath, getCachedModelUrl, evictCachedModel } from "./modelUtils";
 import { useSceneStore } from "../stores/sceneStore";
 
-const MAX_MODEL_FETCH_ATTEMPTS = 2;
+const MAX_MODEL_FETCH_ATTEMPTS = 3;
 const MAX_MODEL_PARSE_ATTEMPTS = 2;
 
 function configureLoader(loader: GLTFLoader) {

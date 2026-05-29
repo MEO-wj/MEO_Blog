@@ -3161,8 +3161,7 @@
   border-right: 1px solid rgba(120, 100, 70, 0.15);
   padding: 36px 48px;
   min-height: 300px;
-  max-height: 55vh;
-  overflow-y: auto;
+  overflow: visible;
 }
 
 .blog-scroll-body::-webkit-scrollbar {
@@ -5663,7 +5662,8 @@
 
 .blog-scroll-body {
   padding: 42px 52px;
-  max-height: 58vh;
+  max-height: none;
+  overflow: visible;
   border-top: 0;
   border-bottom: 0;
 }

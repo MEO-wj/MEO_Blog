@@ -146,7 +146,7 @@ export function SwitchHomeScreen({
   const { authenticated: isAdminAuthenticated, setAuthenticated: setAdminAuthenticated, profile, projects: storeProjects, setProjectSummaries, setProfile } = useAdminStore();
 
   useEffect(() => {
-    api.getProjectSummaries().then((p) => setProjectSummaries(p)).catch(() => {});
+    api.getProjectSummaries(true).then((p) => setProjectSummaries(p)).catch(() => {});
     api.getPublicProfile().then((p) => setProfile(p)).catch(() => {});
   }, []);
 

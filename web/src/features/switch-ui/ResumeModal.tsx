@@ -78,7 +78,7 @@ export function ResumeModal({ onClose }: ResumeModalProps) {
             </div>
           ) : resumeUrl ? (
             <div className="switch-resume-image-wrapper">
-              <img src={resumeUrl} alt="简历" className="switch-resume-image" />
+              <img src={`${resumeUrl}${resumeUrl.includes("?") ? "&" : "?"}_t=${Date.now()}`} alt="简历" className="switch-resume-image" />
               {isAdmin && (
                 <>
                   <input

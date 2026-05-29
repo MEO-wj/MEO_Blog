@@ -264,7 +264,7 @@ export const api = {
   },
 
   // Resume
-  getResume: () => request<{ url: string }>("/resume", undefined, 2, 30 * 60 * 1000),
+  getResume: () => request<{ url: string }>("/resume", undefined, 2, 2 * 60 * 1000),
   uploadResume: async (file: File) => {
     const form = new FormData();
     form.append("file", file);
@@ -281,7 +281,7 @@ export const api = {
 
   // Projects (public)
   getProjects: () => request<Project[]>("/projects", undefined, 2, 5 * 60 * 1000),
-  getProjectSummaries: () => request<ProjectSummary[]>("/projects?fields=summary", undefined, 2, 5 * 60 * 1000),
+  getProjectSummaries: (fresh?: boolean) => request<ProjectSummary[]>("/projects?fields=summary", undefined, 2, fresh ? 0 : 5 * 60 * 1000),
   getProjectDetail: (slug: string) => request<Project>(`/projects/${slug}`, undefined, 2, 5 * 60 * 1000),
 
   // Projects (admin)

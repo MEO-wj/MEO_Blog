@@ -5807,3 +5807,221 @@
     white-space: normal;
   }
 }
+
+/* ==================== Responsive: modals ==================== */
+
+@media (max-width: 1024px) {
+  /* GitHub Profile */
+  .gh-profile-card {
+    max-width: 95vw;
+    max-height: 92vh;
+  }
+  .gh-profile-header {
+    padding: 24px;
+    gap: 16px;
+  }
+  .gh-profile-avatar {
+    width: 72px;
+    height: 72px;
+  }
+  .gh-profile-name {
+    font-size: 22px;
+  }
+  .gh-profile-login {
+    font-size: 17px;
+  }
+  .gh-profile-header-right {
+    margin-left: -40px;
+  }
+  .gh-profile-section {
+    padding: 20px 24px;
+  }
+  .gh-profile-repos-grid {
+    grid-template-columns: 1fr;
+    max-height: 180px;
+  }
+
+  /* Project Detail */
+  .project-detail-card {
+    max-width: 95vw;
+    max-height: 90vh;
+    height: auto;
+    flex-direction: column;
+  }
+  .project-detail-left {
+    width: 100%;
+    padding: 20px;
+    border-right: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    justify-content: center;
+  }
+  .project-detail-icon,
+  .project-detail-icon-fallback {
+    width: 120px;
+    height: 120px;
+  }
+  .project-detail-right {
+    padding: 20px 24px;
+  }
+  .project-detail-title {
+    font-size: 22px;
+  }
+  .project-detail-desc {
+    max-height: 200px;
+  }
+
+  /* Resume */
+  .switch-resume-card {
+    max-width: 95vw;
+  }
+  .switch-resume-image {
+    max-width: 100%;
+  }
+
+  /* Guestbook */
+  .switch-guestbook-card {
+    max-width: 95vw;
+    max-height: 90vh;
+  }
+  .switch-guestbook-body {
+    padding: 14px;
+  }
+  .switch-guestbook-note {
+    padding: 10px 12px;
+  }
+  .switch-guestbook-content {
+    font-size: 16px;
+  }
+  .switch-guestbook-form {
+    padding: 12px 14px;
+  }
+  .switch-guestbook-form textarea {
+    min-height: 48px;
+  }
+}
+
+@media (max-width: 600px) {
+  /* GitHub Profile */
+  .gh-profile-card {
+    border-radius: 10px;
+  }
+  .gh-profile-header {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 20px 16px;
+  }
+  .gh-profile-header-left {
+    flex-direction: column;
+    align-items: center;
+  }
+  .gh-profile-header-right {
+    margin-left: 0;
+  }
+  .gh-profile-meta {
+    justify-content: center;
+  }
+  .gh-profile-link-btn {
+    margin: 12px auto 0;
+  }
+  .gh-profile-section {
+    padding: 16px;
+  }
+  .gh-profile-section-title {
+    font-size: 14px;
+  }
+
+  /* Project Detail */
+  .project-detail-card {
+    border-radius: 10px;
+  }
+  .project-detail-left {
+    padding: 16px;
+  }
+  .project-detail-icon,
+  .project-detail-icon-fallback {
+    width: 96px;
+    height: 96px;
+  }
+  .project-detail-right {
+    padding: 16px;
+    gap: 12px;
+  }
+  .project-detail-title {
+    font-size: 18px;
+  }
+  .project-detail-category {
+    font-size: 10px;
+  }
+  .project-detail-tech-icon {
+    width: 36px;
+    height: 36px;
+  }
+  .project-detail-subtitle {
+    font-size: 14px;
+  }
+  .project-detail-desc {
+    font-size: 13px;
+    max-height: 150px;
+  }
+  .project-detail-btn {
+    padding: 8px 16px;
+    font-size: 13px;
+  }
+
+  /* Resume */
+  .switch-resume-header {
+    padding: 14px 16px;
+  }
+  .switch-resume-header strong {
+    font-size: 17px;
+  }
+  .switch-resume-upload-btn,
+  .switch-resume-empty-placeholder {
+    width: 180px;
+    height: 260px;
+  }
+  .switch-resume-plus {
+    font-size: 36px;
+  }
+
+  /* Guestbook */
+  .switch-guestbook-card {
+    border-width: 2px;
+  }
+  .switch-guestbook-header {
+    padding: 10px 14px;
+  }
+  .switch-guestbook-header strong {
+    font-size: 11px;
+  }
+  .switch-guestbook-note-header {
+    gap: 8px;
+  }
+  .switch-guestbook-nickname {
+    font-size: 9px;
+  }
+  .switch-guestbook-time {
+    font-size: 12px;
+  }
+  .switch-guestbook-content {
+    font-size: 14px;
+  }
+  .switch-guestbook-reply {
+    margin-left: 16px;
+    padding: 8px 10px;
+  }
+  .switch-guestbook-form-row {
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .switch-guestbook-form input,
+  .switch-guestbook-form textarea {
+    padding: 6px 10px;
+    font-size: 14px;
+  }
+  .switch-guestbook-submit {
+    font-size: 9px;
+    padding: 8px 16px;
+  }
+}

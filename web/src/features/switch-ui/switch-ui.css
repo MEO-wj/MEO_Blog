@@ -4096,6 +4096,64 @@
   line-height: 1;
 }
 
+/* ==================== Resume Preview (fullscreen zoom) ==================== */
+
+.switch-resume-preview-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10010;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.92);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  cursor: zoom-out;
+  animation: pd-fade-in 0.25s ease;
+}
+
+.switch-resume-preview-image {
+  max-width: 92vw;
+  max-height: 92vh;
+  object-fit: contain;
+  border-radius: 6px;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.6);
+  cursor: default;
+  animation: switch-resume-preview-zoom-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes switch-resume-preview-zoom-in {
+  from {
+    transform: scale(0.85);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.switch-resume-preview-close {
+  position: fixed;
+  top: 20px;
+  right: 24px;
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font-size: 24px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: background 0.2s;
+  z-index: 10011;
+}
+
+.switch-resume-preview-close:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
 /* ==================== Favorites / RPG Quest Board ==================== */
 
 .switch-favorites-backdrop {

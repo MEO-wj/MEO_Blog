@@ -13,6 +13,7 @@ export function ResumeModal({ onClose }: ResumeModalProps) {
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const [uploading, setUploading] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useWheelScroll<HTMLDivElement>();
 
@@ -29,6 +30,19 @@ export function ResumeModal({ onClose }: ResumeModalProps) {
       setError("加载失败，请检查网络");
     });
   }, [retryCount]);
+
+  // Esc key closes preview
+  useEffect(() => {
+    if (!previewOpen) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        setPreviewOpen(false);
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [previewOpen]);
 
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -78,7 +92,13 @@ export function ResumeModal({ onClose }: ResumeModalProps) {
             </div>
           ) : resumeUrl ? (
             <div className="switch-resume-image-wrapper">
-              <img src={`${resumeUrl}${resumeUrl.includes("?") ? "&" : "?"}_t=${Date.now()}`} alt="简历" className="switch-resume-image" />
+              <img
+                src={`${resumeUrl}${resumeUrl.includes("?") ? "&" : "?"}_t=${Date.now()}`}
+                alt="简历"
+                className="switch-resume-image"
+                style={{ cursor: "zoom-in" }}
+                onClick={() => setPreviewOpen(true)}
+              />
               {isAdmin && (
                 <>
                   <input
@@ -130,6 +150,28 @@ export function ResumeModal({ onClose }: ResumeModalProps) {
           )}
         </div>
       </div>
+
+      {previewOpen && resumeUrl && (
+        <div
+          className="switch-resume-preview-backdrop"
+          onClick={() => setPreviewOpen(false)}
+        >
+          <img
+            src={`${resumeUrl}${resumeUrl.includes("?") ? "&" : "?"}_t=${Date.now()}`}
+            alt="简历预览"
+            className="switch-resume-preview-image"
+            onClick={(e) => e.stopPropagation()}
+          />
+          <button
+            className="switch-resume-preview-close"
+            type="button"
+            aria-label="关闭预览"
+            onClick={() => setPreviewOpen(false)}
+          >
+            ×
+          </button>
+        </div>
+      )}
     </aside>
   );
 }

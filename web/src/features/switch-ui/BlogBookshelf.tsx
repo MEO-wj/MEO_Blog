@@ -28,7 +28,7 @@ export function BlogBookshelf({ onClose }: BlogBookshelfProps) {
   const [creatingCategory, setCreatingCategory] = useState(false);
   const [creatingPost, setCreatingPost] = useState(false);
   const { authenticated: isAdmin } = useAdminStore();
-  const scrollRef = useWheelScroll<HTMLDivElement>({ wheelMultiplier: 2.4 });
+  const scrollRef = useWheelScroll<HTMLDivElement>({ wheelMultiplier: 3.6 });
 
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);

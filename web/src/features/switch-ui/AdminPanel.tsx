@@ -82,7 +82,11 @@ function ProfileEditor({ onSave }: { onSave: (p: AdminProfile) => void }) {
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    api.getProfile().then(setProfile).catch(() => {});
+    // Force fresh session check (bypass 2-min cache) to avoid 401 on profile fetch
+    api.checkSessionFresh().then((s) => {
+      if (s.authenticated) return api.getProfile();
+      return null;
+    }).then((p) => { if (p) setProfile(p); }).catch(() => {});
   }, []);
 
   async function handleAvatar(e: React.ChangeEvent<HTMLInputElement>) {

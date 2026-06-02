@@ -234,6 +234,7 @@ function ShelfView({
                   if (confirm(`确定删除分类"${cat.name}"？`)) {
                     api.deleteBlogCategory(cat.id).then(() => onDeleteCategory(cat.id)).catch((err: unknown) => {
                       const msg = err instanceof Error ? err.message : "未知错误";
+                      if (msg.includes("session")) return;
                       alert(`删除失败：${msg}`);
                     });
                   }
@@ -408,6 +409,7 @@ function PostsView({
       setPosts((prev) => prev.filter((p) => p.id !== id));
     }).catch((err: unknown) => {
       const msg = err instanceof Error ? err.message : "未知错误";
+      if (msg.includes("session")) return; // 401 → session-expired event triggers re-login
       alert(`删除失败：${msg}`);
     });
   }
@@ -549,6 +551,7 @@ function ReaderView({
                   onClick={() => {
                     api.deleteBlogComment(post.id, c.id).then(() => handleCommentDeleted(c.id)).catch((err: unknown) => {
                       const msg = err instanceof Error ? err.message : "未知错误";
+                      if (msg.includes("session")) return;
                       alert(`删除失败：${msg}`);
                     });
                   }}

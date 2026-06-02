@@ -147,6 +147,15 @@ export function SwitchHomeScreen({
   const setContentReady = useSceneStore((s) => s.setContentReady);
   const setIconsReady = useSceneStore((s) => s.setIconsReady);
 
+  // Auto-clear admin auth when session expires (401 from API)
+  useEffect(() => {
+    function onSessionExpired() {
+      setAdminAuthenticated(false);
+    }
+    window.addEventListener("session-expired", onSessionExpired);
+    return () => window.removeEventListener("session-expired", onSessionExpired);
+  }, [setAdminAuthenticated]);
+
   // Tier 1: load project summaries → preload icons → mark content ready
   // Profile loads independently (not blocking the overlay)
   useEffect(() => {

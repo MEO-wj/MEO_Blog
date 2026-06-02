@@ -199,6 +199,11 @@ async function fetchAndCache<T>(
         );
       }
       if (json.error) {
+        // Notify app when session expires so UI can prompt re-login
+        if (res.status === 401) {
+          invalidateCache("GET:/admin/session");
+          window.dispatchEvent(new CustomEvent("session-expired"));
+        }
         throw new RequestFailure(json.error.message, isRetryableStatus(res.status));
       }
       if (!res.ok) {
@@ -233,6 +238,7 @@ export const api = {
       body: JSON.stringify({ password, sequence }),
     }),
   checkSession: () => request<{ authenticated: boolean }>("/admin/session", undefined, 0, 2 * 60 * 1000),
+  checkSessionFresh: () => request<{ authenticated: boolean }>("/admin/session", undefined, 0, 0),
   logout: () => {
     invalidateCache("GET:/admin/session");
     return request<{ loggedOut: boolean }>("/admin/logout", { method: "POST" });

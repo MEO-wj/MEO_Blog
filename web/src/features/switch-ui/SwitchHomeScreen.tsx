@@ -145,12 +145,43 @@ export function SwitchHomeScreen({
 
   const { authenticated: isAdminAuthenticated, setAuthenticated: setAdminAuthenticated, profile, projects: storeProjects, setProjectSummaries, setProfile } = useAdminStore();
   const setContentReady = useSceneStore((s) => s.setContentReady);
+  const setIconsReady = useSceneStore((s) => s.setIconsReady);
 
+  // Tier 1: load project summaries → preload icons → mark content ready
+  // Profile loads independently (not blocking the overlay)
   useEffect(() => {
-    Promise.allSettled([
-      api.getProjectSummaries(true).then((p) => setProjectSummaries(p)),
-      api.getPublicProfile().then((p) => setProfile(p)),
-    ]).then(() => setContentReady());
+    let cancelled = false;
+    api.getProjectSummaries(true).then((projects) => {
+      if (cancelled) return;
+      setProjectSummaries(projects);
+      // Extract icon URLs from fresh API data and preload them
+      const iconUrls = projects
+        .map((p) => p.iconUrl)
+        .filter((u): u is string => !!u);
+      if (iconUrls.length === 0) {
+        setIconsReady();
+        setContentReady();
+        return;
+      }
+      let loaded = 0;
+      for (const url of iconUrls) {
+        const img = new Image();
+        img.onload = img.onerror = () => {
+          loaded++;
+          if (!cancelled && loaded >= iconUrls.length) {
+            setIconsReady();
+            setContentReady();
+          }
+        };
+        img.src = url;
+      }
+    }).catch(() => {
+      // API failed — don't block the overlay forever
+      if (!cancelled) setContentReady();
+    });
+    // Profile loads in parallel, not blocking
+    api.getPublicProfile().then((p) => { if (!cancelled) setProfile(p); }).catch(() => {});
+    return () => { cancelled = true; };
   }, []);
 
   const projectItems = useMemo(() => {
@@ -165,29 +196,6 @@ export function SwitchHomeScreen({
       ),
     ];
   }, [storeProjects]);
-
-  // Preload project icons so they're visible before 3D models finish loading
-  const setIconsReady = useSceneStore((s) => s.setIconsReady);
-  useEffect(() => {
-    const iconUrls = projectItems
-      .map((p) => p.iconUrl)
-      .filter((u): u is string => !!u);
-    if (iconUrls.length === 0) {
-      setIconsReady();
-      return;
-    }
-    let cancelled = false;
-    let loaded = 0;
-    for (const url of iconUrls) {
-      const img = new Image();
-      img.onload = img.onerror = () => {
-        loaded++;
-        if (!cancelled && loaded >= iconUrls.length) setIconsReady();
-      };
-      img.src = url;
-    }
-    return () => { cancelled = true; };
-  }, [projectItems, setIconsReady]);
 
   const currentProject = projectItems[selectedProject] ?? projectItems[0];
   const currentAction = switchHomeActions[selectedAction] ?? switchHomeActions[0];

@@ -21,7 +21,20 @@ export function LoadingOverlay({ layoutReady, layoutError }: LoadingOverlayProps
   const settledModels = loadedModels + skippedModels + failedModels;
   const allModelsSettled = layoutReady && totalModels > 0 && settledModels >= totalModels;
   const ready = allModelsSettled && iconsReady && contentReady;
-  const progress = totalModels > 0 ? Math.min(100, Math.round((settledModels / totalModels) * 100)) : 0;
+
+  // 3-stage progress: models (0-80%) → icons (80-90%) → content (90-100%)
+  const modelProgress = totalModels > 0 ? settledModels / totalModels : 0;
+  let progress: number;
+  if (!allModelsSettled) {
+    progress = Math.round(modelProgress * 80);
+  } else if (!iconsReady) {
+    progress = 80;
+  } else if (!contentReady) {
+    progress = 90;
+  } else {
+    progress = 100;
+  }
+
   const activeError = layoutReady ? lastError : layoutError;
   const hasWarning = failedModels > 0 || skippedModels > 0 || Boolean(layoutError);
 
@@ -51,11 +64,13 @@ export function LoadingOverlay({ layoutReady, layoutError }: LoadingOverlayProps
           ? `Network interrupted. Retrying models (${loadedModels}/${totalModels})`
           : skippedModels > 0
             ? `Loaded with ${skippedModels} model fallback${skippedModels > 1 ? "s" : ""}`
-          : allModelsSettled && !iconsReady
-            ? "Loading interface assets..."
-            : allModelsSettled && iconsReady && !contentReady
-              ? "Loading content..."
-              : `Loading models (${loadedModels}/${totalModels})`;
+            : !allModelsSettled
+              ? `Loading models (${loadedModels}/${totalModels})`
+              : !iconsReady
+                ? "Loading interface assets..."
+                : !contentReady
+                  ? "Loading content..."
+                  : "Ready";
 
   return (
     <div

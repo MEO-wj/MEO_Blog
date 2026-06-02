@@ -7,6 +7,7 @@ interface SceneStore {
   failedModels: number;
   skippedModels: number;
   iconsReady: boolean;
+  contentReady: boolean;
   lastError: string | null;
   registerModel: (id: string) => void;
   modelLoaded: (id: string) => void;
@@ -14,6 +15,7 @@ interface SceneStore {
   modelSkipped: (id: string, message: string) => void;
   clearModelFailure: (id: string) => void;
   setIconsReady: () => void;
+  setContentReady: () => void;
 }
 
 function summarizeModelStates(modelStates: SceneStore["modelStates"]) {
@@ -33,6 +35,7 @@ export const useSceneStore = create<SceneStore>((set) => ({
   failedModels: 0,
   skippedModels: 0,
   iconsReady: false,
+  contentReady: false,
   lastError: null,
   registerModel: (id) => set((s) => {
     if (s.modelStates[id]) return s;
@@ -76,4 +79,5 @@ export const useSceneStore = create<SceneStore>((set) => ({
     };
   }),
   setIconsReady: () => set({ iconsReady: true }),
+  setContentReady: () => set({ contentReady: true }),
 }));

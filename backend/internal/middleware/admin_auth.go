@@ -20,6 +20,7 @@ func RequireAdmin(cfg *config.Config, rdb *redis.Client) func(http.Handler) http
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusUnauthorized)
 				json.NewEncoder(w).Encode(map[string]interface{}{
+					"data": nil,
 					"error": map[string]string{
 						"code":    "UNAUTHORIZED",
 						"message": "admin session required",
@@ -33,6 +34,7 @@ func RequireAdmin(cfg *config.Config, rdb *redis.Client) func(http.Handler) http
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusUnauthorized)
 				json.NewEncoder(w).Encode(map[string]interface{}{
+					"data": nil,
 					"error": map[string]string{
 						"code":    "UNAUTHORIZED",
 						"message": "admin session required",

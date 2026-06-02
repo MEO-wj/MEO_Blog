@@ -104,7 +104,7 @@ func adminLoginHandler(cfg *config.Config) http.HandlerFunc {
 			Expires:  expiresAt,
 			MaxAge:   int(adminSessionTTL.Seconds()),
 			HttpOnly: true,
-			SameSite: http.SameSiteStrictMode,
+			SameSite: http.SameSiteLaxMode,
 			Secure:   r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https",
 		})
 
@@ -149,7 +149,7 @@ func adminLogoutHandler(cfg *config.Config, rdb *redis.Client) http.HandlerFunc 
 			Path:     "/",
 			MaxAge:   -1,
 			HttpOnly: true,
-			SameSite: http.SameSiteStrictMode,
+			SameSite: http.SameSiteLaxMode,
 		})
 
 		RespondOK(w, map[string]interface{}{

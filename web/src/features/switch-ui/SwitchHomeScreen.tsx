@@ -144,10 +144,13 @@ export function SwitchHomeScreen({
   const [clock, setClock] = useState(() => new Date());
 
   const { authenticated: isAdminAuthenticated, setAuthenticated: setAdminAuthenticated, profile, projects: storeProjects, setProjectSummaries, setProfile } = useAdminStore();
+  const setContentReady = useSceneStore((s) => s.setContentReady);
 
   useEffect(() => {
-    api.getProjectSummaries(true).then((p) => setProjectSummaries(p)).catch(() => {});
-    api.getPublicProfile().then((p) => setProfile(p)).catch(() => {});
+    Promise.allSettled([
+      api.getProjectSummaries(true).then((p) => setProjectSummaries(p)),
+      api.getPublicProfile().then((p) => setProfile(p)),
+    ]).then(() => setContentReady());
   }, []);
 
   const projectItems = useMemo(() => {

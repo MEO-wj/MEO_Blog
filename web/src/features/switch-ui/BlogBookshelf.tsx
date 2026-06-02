@@ -232,7 +232,10 @@ function ShelfView({
                 onClick={(e) => {
                   e.stopPropagation();
                   if (confirm(`确定删除分类"${cat.name}"？`)) {
-                    api.deleteBlogCategory(cat.id).then(() => onDeleteCategory(cat.id)).catch(() => alert("删除失败"));
+                    api.deleteBlogCategory(cat.id).then(() => onDeleteCategory(cat.id)).catch((err: unknown) => {
+                      const msg = err instanceof Error ? err.message : "未知错误";
+                      alert(`删除失败：${msg}`);
+                    });
                   }
                 }}
               >
@@ -403,7 +406,10 @@ function PostsView({
     if (!confirm("确定删除此文章？")) return;
     api.deleteBlogPost(id).then(() => {
       setPosts((prev) => prev.filter((p) => p.id !== id));
-    }).catch(() => alert("删除失败"));
+    }).catch((err: unknown) => {
+      const msg = err instanceof Error ? err.message : "未知错误";
+      alert(`删除失败：${msg}`);
+    });
   }
 
   function formatDate(s: string | null) {
@@ -541,7 +547,10 @@ function ReaderView({
                 <button
                   className="blog-comment-delete"
                   onClick={() => {
-                    api.deleteBlogComment(post.id, c.id).then(() => handleCommentDeleted(c.id)).catch(() => alert("删除失败"));
+                    api.deleteBlogComment(post.id, c.id).then(() => handleCommentDeleted(c.id)).catch((err: unknown) => {
+                      const msg = err instanceof Error ? err.message : "未知错误";
+                      alert(`删除失败：${msg}`);
+                    });
                   }}
                 >
                   删除

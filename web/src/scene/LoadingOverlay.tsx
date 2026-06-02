@@ -12,6 +12,7 @@ export function LoadingOverlay({ layoutReady, layoutError }: LoadingOverlayProps
   const failedModels = useSceneStore((s) => s.failedModels);
   const skippedModels = useSceneStore((s) => s.skippedModels);
   const iconsReady = useSceneStore((s) => s.iconsReady);
+  const contentReady = useSceneStore((s) => s.contentReady);
   const lastError = useSceneStore((s) => s.lastError);
   const [done, setDone] = useState(false);
   const minTimerDone = useRef(false);
@@ -19,7 +20,7 @@ export function LoadingOverlay({ layoutReady, layoutError }: LoadingOverlayProps
 
   const settledModels = loadedModels + skippedModels + failedModels;
   const allModelsSettled = layoutReady && totalModels > 0 && settledModels >= totalModels;
-  const ready = allModelsSettled && iconsReady;
+  const ready = allModelsSettled && iconsReady && contentReady;
   const progress = totalModels > 0 ? Math.min(100, Math.round((settledModels / totalModels) * 100)) : 0;
   const activeError = layoutReady ? lastError : layoutError;
   const hasWarning = failedModels > 0 || skippedModels > 0 || Boolean(layoutError);
@@ -52,7 +53,9 @@ export function LoadingOverlay({ layoutReady, layoutError }: LoadingOverlayProps
             ? `Loaded with ${skippedModels} model fallback${skippedModels > 1 ? "s" : ""}`
           : allModelsSettled && !iconsReady
             ? "Loading interface assets..."
-            : `Loading models (${loadedModels}/${totalModels})`;
+            : allModelsSettled && iconsReady && !contentReady
+              ? "Loading content..."
+              : `Loading models (${loadedModels}/${totalModels})`;
 
   return (
     <div

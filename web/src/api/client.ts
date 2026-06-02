@@ -368,6 +368,8 @@ export const api = {
   deleteBlogCategory: async (id: string) => {
     await request<void>(`/admin/blog/categories/${id}`, { method: "DELETE" });
     invalidateCache("GET:/blog/categories");
+    invalidateCache("GET:/blog/posts");
+    invalidateCache("GET:/admin/blog/posts");
   },
   createBlogPost: async (data: BlogPostCreate) => {
     const result = await request<BlogPost>("/admin/blog/posts", {

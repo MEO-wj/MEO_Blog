@@ -62,13 +62,6 @@ const MOBILE_ACTION_SUBTITLES: Record<string, string> = {
   contact: "留言墙",
 };
 
-const PROJECT_STATUS_LABELS: Record<string, string> = {
-  ready: "Ready",
-  soon: "Soon",
-  external: "External",
-  "in-progress": "WIP",
-};
-
 function extractGithubUsername(url?: string): string | null {
   if (!url) return null;
   try {
@@ -96,6 +89,7 @@ export function MobileSwitchAppHome() {
   const adminGateCodeRef = useRef("");
   const detailRequestRef = useRef(0);
   const pageRef = useRef<HTMLElement | null>(null);
+  const projectStripRef = useRef<HTMLDivElement | null>(null);
 
   const {
     authenticated: isAdminAuthenticated,
@@ -130,7 +124,9 @@ export function MobileSwitchAppHome() {
   useEffect(() => {
     let cancelled = false;
 
-    api.getProjectSummaries(true)
+    api.getProjectSummariesCachedFirst((projects) => {
+      if (!cancelled) setProjectSummaries(projects);
+    })
       .then((projects) => {
         if (!cancelled) setProjectSummaries(projects);
       })
@@ -160,10 +156,9 @@ export function MobileSwitchAppHome() {
     });
   }, [projectItems]);
 
-  const selectedProject = useMemo(
-    () => projectItems.find((project) => project.id === selectedProjectId) ?? projectItems[0],
-    [projectItems, selectedProjectId],
-  );
+  useEffect(() => {
+    projectStripRef.current?.scrollTo({ left: 0 });
+  }, [projectItems]);
 
   const dockActions = useMemo(
     () => MOBILE_DOCK_ACTION_IDS
@@ -329,7 +324,9 @@ export function MobileSwitchAppHome() {
     <section ref={pageRef} className="mobile-switch-app" aria-label="MEO Blog mobile home">
       <header className="mobile-topbar">
         <div className="mobile-brand-group">
-          <span className="mobile-brand-pill">MEO Blog</span>
+          <span className="mobile-site-icon" aria-hidden="true">
+            <img src="/site-icon.png" alt="" draggable="false" />
+          </span>
           <div className="mobile-profile-copy">
             <strong>{displayName}</strong>
             <span>{displayMeta}</span>
@@ -372,9 +369,6 @@ export function MobileSwitchAppHome() {
                 <button type="button" role="menuitem" onClick={() => void openAdminArea()}>
                   {sessionChecking ? "检查中..." : "管理后台"}
                 </button>
-                <button type="button" role="menuitem" onClick={() => setAvatarMenuOpen(false)}>
-                  关闭
-                </button>
               </div>
             )}
           </div>
@@ -385,11 +379,10 @@ export function MobileSwitchAppHome() {
         <section className="mobile-section mobile-projects-section" aria-labelledby="mobile-projects-title">
           <div className="mobile-section-heading">
             <h1 id="mobile-projects-title">项目</h1>
-            {selectedProject && <span>{selectedProject.category || "MEO"}</span>}
           </div>
 
           {projectItems.length > 0 ? (
-            <div className="mobile-project-strip" role="list" aria-label="项目列表">
+            <div ref={projectStripRef} className="mobile-project-strip" role="list" aria-label="项目列表">
               {projectItems.map((project) => (
                 <button
                   key={project.id}
@@ -413,7 +406,6 @@ export function MobileSwitchAppHome() {
                   </span>
                   <span className="mobile-project-square-info">
                     <strong>{project.title}</strong>
-                    <span>{project.category || PROJECT_STATUS_LABELS[project.status ?? "ready"] || "Ready"}</span>
                   </span>
                 </button>
               ))}

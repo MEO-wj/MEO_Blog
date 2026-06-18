@@ -160,33 +160,30 @@ export function SwitchHomeScreen({
   // Profile loads independently (not blocking the overlay)
   useEffect(() => {
     let cancelled = false;
-    api.getProjectSummaries(true).then((projects) => {
-      if (cancelled) return;
-      setProjectSummaries(projects);
-      // Extract icon URLs from fresh API data and preload them
-      const iconUrls = projects
-        .map((p) => p.iconUrl)
-        .filter((u): u is string => !!u);
-      if (iconUrls.length === 0) {
-        setIconsReady();
-        setContentReady();
-        return;
-      }
-      let loaded = 0;
-      for (const url of iconUrls) {
+
+    const warmProjectIcons = (projects: Array<{ iconUrl?: string }>) => {
+      for (const url of projects.map((p) => p.iconUrl).filter((u): u is string => !!u)) {
         const img = new Image();
-        img.onload = img.onerror = () => {
-          loaded++;
-          if (!cancelled && loaded >= iconUrls.length) {
-            setIconsReady();
-            setContentReady();
-          }
-        };
         img.src = url;
       }
+    };
+
+    api.getProjectSummariesCachedFirst((projects) => {
+      if (cancelled) return;
+      setProjectSummaries(projects);
+      warmProjectIcons(projects);
+    }).then((projects) => {
+      if (cancelled) return;
+      setProjectSummaries(projects);
+      setIconsReady();
+      setContentReady();
+      warmProjectIcons(projects);
     }).catch(() => {
       // API failed — don't block the overlay forever
-      if (!cancelled) setContentReady();
+      if (!cancelled) {
+        setIconsReady();
+        setContentReady();
+      }
     });
     // Profile loads in parallel, not blocking
     api.getPublicProfile().then((p) => { if (!cancelled) setProfile(p); }).catch(() => {});

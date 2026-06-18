@@ -4,6 +4,8 @@ const BASE_URL = import.meta.env.VITE_API_URL ?? "/api/v1";
 const GET_TIMEOUT_MS = 12000;
 const MUTATION_TIMEOUT_MS = 30000;
 const UPLOAD_TIMEOUT_MS = 120000;
+const PROJECT_SUMMARIES_PATH = "/projects?fields=summary";
+const PROJECT_SUMMARIES_CACHE_MS = 5 * 60 * 1000;
 
 class RequestFailure extends Error {
   retryable: boolean;
@@ -128,6 +130,48 @@ async function request<T>(path: string, init?: RequestInit, retries = 2, cacheMs
     promise.finally(() => inflight.delete(cacheKey));
   }
   return promise;
+}
+
+async function requestNetworkAndCache<T>(
+  path: string,
+  init?: RequestInit,
+  retries = 2,
+  cacheMs?: number,
+): Promise<T> {
+  const isFormData = init?.body instanceof FormData;
+  const headers: Record<string, string> = isFormData
+    ? { ...init?.headers as Record<string, string> }
+    : { "Content-Type": "application/json", ...init?.headers as Record<string, string> };
+
+  const method = (init?.method ?? "GET").toUpperCase();
+  const cacheKey = `${method}:${path}`;
+
+  if (method === "GET" && cacheMs) {
+    const entry = getCacheEntry(cacheKey);
+    if (entry?.etag) headers["If-None-Match"] = entry.etag;
+  }
+
+  return fetchAndCache<T>(cacheKey, path, init, headers, retries, cacheMs);
+}
+
+function projectSummariesEqual(a: ProjectSummary[], b: ProjectSummary[]): boolean {
+  if (a.length !== b.length) return false;
+
+  return a.every((left, index) => {
+    const right = b[index];
+    return Boolean(right)
+      && left.id === right.id
+      && left.name === right.name
+      && left.slug === right.slug
+      && left.coverUrl === right.coverUrl
+      && left.iconUrl === right.iconUrl
+      && left.accentColor === right.accentColor
+      && left.category === right.category
+      && left.status === right.status
+      && left.pinned === right.pinned
+      && left.sortOrder === right.sortOrder
+      && left.updatedAt === right.updatedAt;
+  });
 }
 
 function requestTimeoutMs(method: string, init?: RequestInit): number {
@@ -287,7 +331,29 @@ export const api = {
 
   // Projects (public)
   getProjects: () => request<Project[]>("/projects", undefined, 2, 5 * 60 * 1000),
-  getProjectSummaries: (fresh?: boolean) => request<ProjectSummary[]>("/projects?fields=summary", undefined, 2, fresh ? 0 : 5 * 60 * 1000),
+  getProjectSummaries: (fresh?: boolean) => fresh
+    ? requestNetworkAndCache<ProjectSummary[]>(PROJECT_SUMMARIES_PATH, undefined, 2, PROJECT_SUMMARIES_CACHE_MS)
+    : request<ProjectSummary[]>(PROJECT_SUMMARIES_PATH, undefined, 2, PROJECT_SUMMARIES_CACHE_MS),
+  getProjectSummariesCachedFirst: (onRefresh?: (projects: ProjectSummary[]) => void) => {
+    const cached = readCacheSync<ProjectSummary[]>(PROJECT_SUMMARIES_PATH, PROJECT_SUMMARIES_CACHE_MS);
+
+    if (cached) {
+      void requestNetworkAndCache<ProjectSummary[]>(
+        PROJECT_SUMMARIES_PATH,
+        undefined,
+        2,
+        PROJECT_SUMMARIES_CACHE_MS,
+      )
+        .then((fresh) => {
+          if (!projectSummariesEqual(cached, fresh)) onRefresh?.(fresh);
+        })
+        .catch(() => {});
+
+      return Promise.resolve(cached);
+    }
+
+    return request<ProjectSummary[]>(PROJECT_SUMMARIES_PATH, undefined, 2, PROJECT_SUMMARIES_CACHE_MS);
+  },
   getProjectDetail: (slug: string) => request<Project>(`/projects/${slug}`, undefined, 2, 5 * 60 * 1000),
 
   // Projects (admin)

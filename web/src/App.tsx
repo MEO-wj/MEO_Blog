@@ -1,8 +1,9 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Layout } from "./app/Layout";
 
 const SceneEntry = lazy(() => import("./scene/SceneEntry").then(m => ({ default: m.SceneEntry })));
+const MobileSwitchAppHome = lazy(() => import("./features/switch-ui/MobileSwitchAppHome").then(m => ({ default: m.MobileSwitchAppHome })));
 
 const DashboardPage = lazy(() => import("./features/dashboard/DashboardPage").then(m => ({ default: m.DashboardPage })));
 const PostsPage = lazy(() => import("./features/posts/PostsPage").then(m => ({ default: m.PostsPage })));
@@ -36,11 +37,38 @@ function RootLoader() {
   );
 }
 
+function useIsMobileHome() {
+  const [isMobile, setIsMobile] = useState(() =>
+    window.matchMedia("(max-width: 760px)").matches,
+  );
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 760px)");
+    const onChange = () => setIsMobile(media.matches);
+
+    onChange();
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
+  }, []);
+
+  return isMobile;
+}
+
+function HomeEntry() {
+  const isMobile = useIsMobileHome();
+
+  return (
+    <Suspense fallback={<RootLoader />}>
+      {isMobile ? <MobileSwitchAppHome /> : <SceneEntry />}
+    </Suspense>
+  );
+}
+
 export function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Suspense fallback={<RootLoader />}><SceneEntry /></Suspense>} />
+        <Route path="/" element={<HomeEntry />} />
         <Route element={<Layout />}>
           <Route path="/dashboard" element={<Suspense fallback={<PageLoader />}><DashboardPage /></Suspense>} />
           <Route path="/posts" element={<Suspense fallback={<PageLoader />}><PostsPage /></Suspense>} />

@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { readCacheSync } from "../api/client";
-import type { AdminProfile, Project, ProjectSummary } from "../api/types";
+import type { AdminProfile, Partner, Project, ProjectSummary } from "../api/types";
 import type { SwitchHomeProject } from "../features/switch-ui/switchHomeData";
 
 interface AdminStore {
@@ -8,10 +8,12 @@ interface AdminStore {
   profile: AdminProfile | null;
   projects: SwitchHomeProject[];
   rawProjects: Project[];
+  partners: Partner[];
   setAuthenticated: (v: boolean) => void;
   setProfile: (p: AdminProfile | null) => void;
   setProjects: (p: Project[]) => void;
   setProjectSummaries: (p: ProjectSummary[]) => void;
+  setPartners: (p: Partner[]) => void;
   logout: () => void;
 }
 
@@ -47,8 +49,9 @@ export function mapProjectSummary(p: ProjectSummary): SwitchHomeProject {
 }
 
 // Initialize from localStorage cache to avoid empty flash on mount
-const cachedSummaries = readCacheSync<ProjectSummary[]>("/projects?fields=summary", 5 * 60 * 1000);
+const cachedSummaries = readCacheSync<ProjectSummary[]>("/projects/summary?compact=1", 5 * 60 * 1000);
 const cachedProfile = readCacheSync<AdminProfile>("/profile", 10 * 60 * 1000);
+const cachedPartners = readCacheSync<Partner[]>("/partners", 5 * 60 * 1000);
 const initialProjects = cachedSummaries ? cachedSummaries.map(mapProjectSummary) : [];
 
 export const useAdminStore = create<AdminStore>((set) => ({
@@ -56,12 +59,14 @@ export const useAdminStore = create<AdminStore>((set) => ({
   profile: cachedProfile,
   projects: initialProjects,
   rawProjects: [],
+  partners: cachedPartners ?? [],
   setAuthenticated: (v) => set({ authenticated: v }),
   setProfile: (p) => set({ profile: p }),
   setProjects: (rawProjects) =>
     set({ rawProjects, projects: rawProjects.map(mapBackendProject) }),
   setProjectSummaries: (summaries) =>
     set({ projects: summaries.map(mapProjectSummary) }),
+  setPartners: (partners) => set({ partners }),
   logout: () =>
     set({ authenticated: false }),
 }));

@@ -1,10 +1,10 @@
-import type { APIResponse, AdminProfile, ProfileUpdate, Project, ProjectSummary, ProjectCreate, ProjectUpdate, GHUser, GHRepo, GHContributions, BlogCategory, BlogCategoryCreate, BlogPost, BlogPostCreate, BlogPostUpdate, BlogComment, BlogCommentCreate, GuestbookMessage, GuestbookMessageCreate, GuestbookReplyCreate, Favorite } from "./types";
+import type { APIResponse, AdminProfile, ProfileUpdate, Project, ProjectSummary, ProjectCreate, ProjectUpdate, GHUser, GHRepo, GHContributions, BlogCategory, BlogCategoryCreate, BlogPost, BlogPostCreate, BlogPostUpdate, BlogComment, BlogCommentCreate, GuestbookMessage, GuestbookMessageCreate, GuestbookReplyCreate, Favorite, Partner, PartnerUpdate } from "./types";
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? "/api/v1";
 const GET_TIMEOUT_MS = 12000;
 const MUTATION_TIMEOUT_MS = 30000;
 const UPLOAD_TIMEOUT_MS = 120000;
-const PROJECT_SUMMARIES_PATH = "/projects?fields=summary";
+const PROJECT_SUMMARIES_PATH = "/projects/summary?compact=1";
 const PROJECT_SUMMARIES_CACHE_MS = 5 * 60 * 1000;
 
 class RequestFailure extends Error {
@@ -332,8 +332,8 @@ export const api = {
   // Projects (public)
   getProjects: () => request<Project[]>("/projects", undefined, 2, 5 * 60 * 1000),
   getProjectSummaries: (fresh?: boolean) => fresh
-    ? requestNetworkAndCache<ProjectSummary[]>(PROJECT_SUMMARIES_PATH, undefined, 2, PROJECT_SUMMARIES_CACHE_MS)
-    : request<ProjectSummary[]>(PROJECT_SUMMARIES_PATH, undefined, 2, PROJECT_SUMMARIES_CACHE_MS),
+    ? requestNetworkAndCache<ProjectSummary[]>(PROJECT_SUMMARIES_PATH, undefined, 1, PROJECT_SUMMARIES_CACHE_MS)
+    : request<ProjectSummary[]>(PROJECT_SUMMARIES_PATH, undefined, 1, PROJECT_SUMMARIES_CACHE_MS),
   getProjectSummariesCachedFirst: (onRefresh?: (projects: ProjectSummary[]) => void) => {
     const cached = readCacheSync<ProjectSummary[]>(PROJECT_SUMMARIES_PATH, PROJECT_SUMMARIES_CACHE_MS);
 
@@ -341,7 +341,7 @@ export const api = {
       void requestNetworkAndCache<ProjectSummary[]>(
         PROJECT_SUMMARIES_PATH,
         undefined,
-        2,
+        1,
         PROJECT_SUMMARIES_CACHE_MS,
       )
         .then((fresh) => {
@@ -352,7 +352,7 @@ export const api = {
       return Promise.resolve(cached);
     }
 
-    return request<ProjectSummary[]>(PROJECT_SUMMARIES_PATH, undefined, 2, PROJECT_SUMMARIES_CACHE_MS);
+    return request<ProjectSummary[]>(PROJECT_SUMMARIES_PATH, undefined, 1, PROJECT_SUMMARIES_CACHE_MS);
   },
   getProjectDetail: (slug: string) => request<Project>(`/projects/${slug}`, undefined, 2, 5 * 60 * 1000),
 
@@ -549,5 +549,46 @@ export const api = {
       console.error("[updateFavoritePosition] save failed:", err);
       throw err;
     }
+  },
+
+  // Partners (public)
+  getPartners: () => request<Partner[]>("/partners", undefined, 2, 5 * 60 * 1000),
+
+  // Partners (admin)
+  createPartner: async (file: File, name: string, websiteUrl?: string) => {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("name", name);
+    if (websiteUrl) form.append("websiteUrl", websiteUrl);
+    const result = await request<Partner>("/admin/partners", {
+      method: "POST",
+      body: form,
+      headers: {},
+    });
+    invalidateCache("GET:/partners");
+    return result;
+  },
+  updatePartner: async (id: string, data: PartnerUpdate) => {
+    const result = await request<Partner>(`/admin/partners/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+    invalidateCache("GET:/partners");
+    return result;
+  },
+  uploadPartnerAvatar: async (id: string, file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    const result = await request<{ url: string }>(`/admin/partners/${id}/avatar`, {
+      method: "POST",
+      body: form,
+      headers: {},
+    });
+    invalidateCache("GET:/partners");
+    return result;
+  },
+  deletePartner: async (id: string) => {
+    await request<void>(`/admin/partners/${id}`, { method: "DELETE" });
+    invalidateCache("GET:/partners");
   },
 };

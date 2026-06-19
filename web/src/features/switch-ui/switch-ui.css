@@ -1043,8 +1043,8 @@
 }
 
 .admin-panel-window {
-  width: 1160px;
-  height: 640px;
+  width: min(1160px, calc(100vw - 32px));
+  height: min(640px, calc(100dvh - 32px));
   position: relative;
   border: 2px solid #35d39a;
   border-radius: 8px;
@@ -1062,9 +1062,16 @@
   border-bottom: 1px solid rgba(53, 211, 154, 0.36);
   background: #16181c;
   flex-shrink: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.admin-panel-tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .admin-panel-tabs button {
+  flex: 0 0 auto;
   padding: 10px 28px;
   color: rgba(53, 211, 154, 0.6);
   background: transparent;
@@ -1212,7 +1219,8 @@
 
 .admin-project-list-header button,
 .admin-panel-actions button,
-.admin-project-actions button {
+.admin-project-actions button,
+.admin-partner-create > button[type="submit"] {
   border: 1px solid rgba(53, 211, 154, 0.52);
   border-radius: 6px;
   padding: 6px 14px;
@@ -1226,19 +1234,22 @@
 
 .admin-project-list-header button:hover,
 .admin-panel-actions button:hover,
-.admin-project-actions button:hover {
+.admin-project-actions button:hover,
+.admin-partner-create > button[type="submit"]:hover {
   background: #1e2226;
 }
 
 .admin-panel-actions button[type="submit"],
-.admin-project-list-header button {
+.admin-project-list-header button,
+.admin-partner-create > button[type="submit"] {
   color: #101214;
   background: #35d39a;
   border-color: #35d39a;
 }
 
 .admin-panel-actions button[type="submit"]:hover,
-.admin-project-list-header button:hover {
+.admin-project-list-header button:hover,
+.admin-partner-create > button[type="submit"]:hover {
   background: #2fc08a;
 }
 
@@ -1330,6 +1341,11 @@
 .admin-project-actions {
   display: flex;
   gap: 8px;
+}
+
+.admin-project-actions button:disabled {
+  cursor: wait;
+  opacity: 0.58;
 }
 
 .admin-project-actions button.danger {
@@ -1490,6 +1506,96 @@
 .admin-profile-form .admin-bio-textarea {
   max-height: 120px;
   overflow-y: auto;
+}
+
+/* Partner manager */
+
+.admin-partner-manager {
+  display: grid;
+  gap: 22px;
+}
+
+.admin-partner-create {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) minmax(0, 1.35fr) auto;
+  gap: 14px;
+  align-items: end;
+  border: 1px solid rgba(53, 211, 154, 0.18);
+  border-radius: 8px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.admin-partner-create label {
+  margin-bottom: 0;
+}
+
+.admin-partner-create > button[type="submit"] {
+  min-height: 38px;
+  white-space: nowrap;
+}
+
+.admin-partner-avatar-upload,
+.admin-partner-avatar {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 50%;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.admin-partner-avatar-upload {
+  width: 68px;
+  height: 68px;
+  border: 2px dashed rgba(53, 211, 154, 0.52);
+  color: rgba(53, 211, 154, 0.68);
+  background: rgba(53, 211, 154, 0.06);
+  font-size: 28px;
+}
+
+.admin-partner-avatar-upload:hover {
+  border-color: #35d39a;
+}
+
+.admin-partner-avatar-upload img,
+.admin-partner-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.admin-partner-list {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-partner-row {
+  display: grid;
+  grid-template-columns: 56px minmax(120px, 0.8fr) minmax(180px, 1.3fr) auto;
+  gap: 12px;
+  align-items: end;
+  border: 1px solid rgba(53, 211, 154, 0.18);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.admin-partner-row label {
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+.admin-partner-avatar {
+  width: 52px;
+  height: 52px;
+  border: 1px solid rgba(53, 211, 154, 0.36);
+  padding: 0;
+  background: #080a0b;
+}
+
+.admin-partner-avatar:disabled {
+  cursor: wait;
+  opacity: 0.62;
 }
 
 .admin-extra-emails {
@@ -5281,6 +5387,152 @@
 }
 
 @media (max-width: 860px) {
+  .switch-admin-panel {
+    place-items: stretch;
+    padding: 0;
+  }
+
+  .admin-panel-window {
+    width: 100vw;
+    height: 100dvh;
+    border-width: 0;
+    border-radius: 0;
+  }
+
+  .admin-panel-window .switch-terminal-bar {
+    height: auto;
+    min-height: calc(env(safe-area-inset-top) + 48px);
+    padding: calc(env(safe-area-inset-top) + 8px) 10px 8px;
+    gap: 7px;
+  }
+
+  .admin-panel-window .switch-terminal-bar > span {
+    width: 9px;
+    height: 9px;
+  }
+
+  .admin-panel-window .switch-terminal-bar strong {
+    min-width: 0;
+    flex: 1;
+    margin-left: 4px;
+    overflow: hidden;
+    font-size: 13px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .admin-panel-window .switch-terminal-bar button {
+    width: 34px;
+    height: 34px;
+    flex: 0 0 auto;
+  }
+
+  .admin-logout-btn {
+    max-width: 86px;
+    padding: 0 8px !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .admin-panel-tabs {
+    padding: 0 4px;
+  }
+
+  .admin-panel-tabs button {
+    padding: 11px 16px;
+    font-size: 13px;
+  }
+
+  .admin-panel-body {
+    padding: 16px 14px calc(env(safe-area-inset-bottom) + 22px);
+    font-size: 13px;
+  }
+
+  .admin-panel-body input,
+  .admin-panel-body textarea,
+  .admin-panel-body select {
+    min-height: 42px;
+    font-size: 16px;
+  }
+
+  .admin-profile-header,
+  .admin-form-row,
+  .admin-project-list-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .admin-profile-header {
+    gap: 14px;
+  }
+
+  .admin-avatar-upload {
+    width: 74px;
+    height: 74px;
+  }
+
+  .admin-project-row {
+    display: grid;
+    grid-template-columns: 20px 44px minmax(0, 1fr);
+    gap: 10px;
+    align-items: center;
+  }
+
+  .admin-project-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+  }
+
+  .admin-project-actions button,
+  .admin-panel-actions button,
+  .admin-project-list-header button,
+  .admin-partner-create > button[type="submit"] {
+    min-height: 40px;
+  }
+
+  .admin-panel-actions {
+    flex-wrap: wrap;
+  }
+
+  .admin-panel-msg {
+    left: 14px;
+    right: 14px;
+    bottom: calc(env(safe-area-inset-bottom) + 18px);
+    text-align: center;
+  }
+
+  .admin-partner-create,
+  .admin-partner-row {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .admin-partner-avatar-upload,
+  .admin-partner-avatar {
+    justify-self: start;
+  }
+
+  .admin-partner-row .admin-project-actions {
+    grid-column: auto;
+    justify-content: stretch;
+  }
+
+  .admin-partner-row .admin-project-actions button {
+    flex: 1;
+  }
+
+  .tech-picker-card {
+    width: 100vw;
+    height: 100dvh;
+    max-height: none;
+    border-radius: 0;
+  }
+
+  .tech-picker-grid {
+    grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
+  }
+
   .switch-favorites-card {
     width: 96vw;
     max-height: 92vh;

@@ -87,6 +87,21 @@ export interface AdminProfile {
   resumeUrl: string;
 }
 
+export interface Partner {
+  id: string;
+  name: string;
+  avatarUrl: string;
+  websiteUrl: string;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PartnerUpdate {
+  name?: string;
+  websiteUrl?: string;
+}
+
 export interface ProfileUpdate {
   displayName?: string;
   email?: string;

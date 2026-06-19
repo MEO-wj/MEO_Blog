@@ -47,6 +47,7 @@ const ADMIN_GATE_CODE_PARTS: Record<AdminGateKey, string> = {
 
 const MOBILE_DOCK_ACTION_IDS = ["github-home", "resume", "contact"];
 const MOBILE_SPACE_ACTION_IDS = ["github-home", "resume", "contact"];
+const MOBILE_PROJECT_SKELETON_COUNT = 4;
 
 const MOBILE_ACTION_LABELS: Record<string, string> = {
   "github-home": "GitHub",
@@ -95,7 +96,9 @@ export function MobileSwitchAppHome() {
     authenticated: isAdminAuthenticated,
     profile,
     projects: storeProjects,
+    partners,
     setAuthenticated: setAdminAuthenticated,
+    setPartners,
     setProfile,
     setProjectSummaries,
   } = useAdminStore();
@@ -112,6 +115,7 @@ export function MobileSwitchAppHome() {
   const [adminAuthStatus, setAdminAuthStatus] = useState<"idle" | "submitting" | "error">("idle");
   const [adminAuthMessage, setAdminAuthMessage] = useState("");
   const [sessionChecking, setSessionChecking] = useState(false);
+  const [projectsLoading, setProjectsLoading] = useState(true);
 
   useEffect(() => {
     function onSessionExpired() {
@@ -130,7 +134,10 @@ export function MobileSwitchAppHome() {
       .then((projects) => {
         if (!cancelled) setProjectSummaries(projects);
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setProjectsLoading(false);
+      });
 
     api.getPublicProfile()
       .then((p) => {
@@ -138,10 +145,16 @@ export function MobileSwitchAppHome() {
       })
       .catch(() => {});
 
+    api.getPartners()
+      .then((p) => {
+        if (!cancelled) setPartners(p);
+      })
+      .catch(() => {});
+
     return () => {
       cancelled = true;
     };
-  }, [setProfile, setProjectSummaries]);
+  }, [setPartners, setProfile, setProjectSummaries]);
 
   const projectItems = useMemo(() => {
     const source = storeProjects.length > 0 ? storeProjects : switchHomeProjects;
@@ -176,6 +189,7 @@ export function MobileSwitchAppHome() {
 
   const displayName = profile?.displayName || switchHomeUser.name;
   const displayMeta = profile?.bio || profile?.email || "MEO Blog";
+  const visiblePartners = partners.filter((partner) => partner.avatarUrl && partner.name.trim());
 
   function resetAdminGate() {
     adminGateCodeRef.current = "";
@@ -376,6 +390,45 @@ export function MobileSwitchAppHome() {
       </header>
 
       <main className="mobile-app-content">
+        {visiblePartners.length > 0 && (
+          <section className="mobile-partner-section" aria-labelledby="mobile-partners-title">
+            <div className="mobile-section-heading mobile-partner-heading">
+              <h2 id="mobile-partners-title">合作伙伴</h2>
+            </div>
+            <div className="mobile-partner-strip" role="list">
+              {visiblePartners.map((partner) => {
+                const content = (
+                  <>
+                    <span className="mobile-partner-avatar">
+                      <img src={partner.avatarUrl} alt="" draggable="false" />
+                    </span>
+                    <span className="mobile-partner-name">{partner.name}</span>
+                  </>
+                );
+
+                return partner.websiteUrl ? (
+                  <a
+                    key={partner.id}
+                    className="mobile-partner-item"
+                    href={partner.websiteUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    role="listitem"
+                    aria-label={`打开 ${partner.name} 的网站`}
+                    onClick={() => playSound("action-click")}
+                  >
+                    {content}
+                  </a>
+                ) : (
+                  <div key={partner.id} className="mobile-partner-item" role="listitem">
+                    {content}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
         <section className="mobile-section mobile-projects-section" aria-labelledby="mobile-projects-title">
           <div className="mobile-section-heading">
             <h1 id="mobile-projects-title">项目</h1>
@@ -408,6 +461,22 @@ export function MobileSwitchAppHome() {
                     <strong>{project.title}</strong>
                   </span>
                 </button>
+              ))}
+            </div>
+          ) : projectsLoading ? (
+            <div
+              className="mobile-project-strip mobile-project-strip-skeleton"
+              role="list"
+              aria-label="项目加载中"
+              aria-busy="true"
+            >
+              {Array.from({ length: MOBILE_PROJECT_SKELETON_COUNT }).map((_, index) => (
+                <div key={index} className="mobile-project-square-card mobile-project-skeleton-card" role="listitem">
+                  <span className="mobile-project-square-art mobile-project-skeleton-art" />
+                  <span className="mobile-project-square-info">
+                    <span className="mobile-project-skeleton-label" />
+                  </span>
+                </div>
               ))}
             </div>
           ) : (

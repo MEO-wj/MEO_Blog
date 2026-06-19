@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { api } from "../../api/client";
 import { saveQueue } from "../../api/saveQueue";
-import type { AdminProfile, Project, ProjectCreate, ProjectSummary, ProjectUpdate } from "../../api/types";
+import type { AdminProfile, Partner, Project, ProjectCreate, ProjectSummary, ProjectUpdate } from "../../api/types";
 import { useAdminStore } from "../../stores/adminStore";
 import { useWheelScroll } from "./useWheelScroll";
 
@@ -15,8 +15,8 @@ const ACCENT_COLORS = [
 ];
 
 export function AdminPanel({ onClose }: AdminPanelProps) {
-  const [tab, setTab] = useState<"profile" | "projects">("profile");
-  const { setProfile, setProjectSummaries, logout } = useAdminStore();
+  const [tab, setTab] = useState<"profile" | "projects" | "partners">("profile");
+  const { setProfile, setProjectSummaries, setPartners, logout } = useAdminStore();
   const scrollRef = useWheelScroll<HTMLDivElement>();
 
   async function handleLogout() {
@@ -60,6 +60,12 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
           >
             项目管理
           </button>
+          <button
+            className={tab === "partners" ? "active" : ""}
+            onClick={() => setTab("partners")}
+          >
+            合作伙伴
+          </button>
         </div>
         <div ref={scrollRef} className="admin-panel-body">
           {tab === "profile" && (
@@ -67,6 +73,9 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
           )}
           {tab === "projects" && (
             <ProjectManager onSave={(p) => setProjectSummaries(p)} />
+          )}
+          {tab === "partners" && (
+            <PartnerManager onSave={(p) => setPartners(p)} />
           )}
         </div>
       </div>
@@ -470,6 +479,275 @@ function ProjectManager({ onSave }: { onSave: (p: ProjectSummary[]) => void }) {
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+function PartnerManager({ onSave }: { onSave: (p: Partner[]) => void }) {
+  const [partners, setPartners] = useState<Partner[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [draftName, setDraftName] = useState("");
+  const [draftWebsite, setDraftWebsite] = useState("");
+  const [draftAvatarFile, setDraftAvatarFile] = useState<File | null>(null);
+  const [draftAvatarPreview, setDraftAvatarPreview] = useState("");
+  const [editing, setEditing] = useState<Record<string, { name: string; websiteUrl: string }>>({});
+  const [msg, setMsg] = useState("");
+  const [msgType, setMsgType] = useState<"success" | "error">("success");
+  const createFileRef = useRef<HTMLInputElement>(null);
+  const rowFileRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  useEffect(() => {
+    api.getPartners().then((p) => {
+      setPartners(p);
+      onSave(p);
+      const nextEditing: Record<string, { name: string; websiteUrl: string }> = {};
+      p.forEach((partner) => {
+        nextEditing[partner.id] = { name: partner.name, websiteUrl: partner.websiteUrl };
+      });
+      setEditing(nextEditing);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, []);
+
+  useEffect(() => () => {
+    if (draftAvatarPreview) URL.revokeObjectURL(draftAvatarPreview);
+  }, [draftAvatarPreview]);
+
+  function showMessage(text: string, type: "success" | "error" = "success") {
+    setMsg(text);
+    setMsgType(type);
+    window.setTimeout(() => setMsg(""), 2200);
+  }
+
+  function syncPartners(next: Partner[]) {
+    setPartners(next);
+    onSave(next);
+  }
+
+  function updateEditing(id: string, patch: Partial<{ name: string; websiteUrl: string }>) {
+    const empty = { name: "", websiteUrl: "" };
+    setEditing((prev) => ({
+      ...prev,
+      [id]: { ...empty, ...prev[id], ...patch },
+    }));
+  }
+
+  function handleDraftAvatar(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (draftAvatarPreview) URL.revokeObjectURL(draftAvatarPreview);
+    const preview = URL.createObjectURL(file);
+    setDraftAvatarFile(file);
+    setDraftAvatarPreview(preview);
+  }
+
+  async function handleCreate(ev: FormEvent) {
+    ev.preventDefault();
+    const name = draftName.trim();
+    if (!name) {
+      showMessage("请填写伙伴昵称", "error");
+      return;
+    }
+    if (!draftAvatarFile) {
+      showMessage("请上传伙伴头像", "error");
+      return;
+    }
+
+    setCreating(true);
+    try {
+      const partner = await api.createPartner(draftAvatarFile, name, draftWebsite.trim());
+      const next = [...partners, partner];
+      syncPartners(next);
+      setEditing((prev) => ({
+        ...prev,
+        [partner.id]: { name: partner.name, websiteUrl: partner.websiteUrl },
+      }));
+      setDraftName("");
+      setDraftWebsite("");
+      setDraftAvatarFile(null);
+      if (draftAvatarPreview) URL.revokeObjectURL(draftAvatarPreview);
+      setDraftAvatarPreview("");
+      if (createFileRef.current) createFileRef.current.value = "";
+      showMessage("伙伴已添加");
+    } catch (error) {
+      showMessage(error instanceof Error ? error.message : "添加失败", "error");
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function handleSave(partner: Partner) {
+    const form = editing[partner.id] ?? { name: partner.name, websiteUrl: partner.websiteUrl };
+    const name = form.name.trim();
+    if (!name) {
+      showMessage("昵称不能为空", "error");
+      return;
+    }
+
+    setSavingId(partner.id);
+    try {
+      const updated = await api.updatePartner(partner.id, {
+        name,
+        websiteUrl: form.websiteUrl.trim(),
+      });
+      const next = partners.map((p) => (p.id === partner.id ? updated : p));
+      syncPartners(next);
+      updateEditing(partner.id, { name: updated.name, websiteUrl: updated.websiteUrl });
+      showMessage("伙伴已保存");
+    } catch (error) {
+      showMessage(error instanceof Error ? error.message : "保存失败", "error");
+    } finally {
+      setSavingId(null);
+    }
+  }
+
+  async function handleAvatar(id: string, e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setSavingId(id);
+    try {
+      const { url } = await api.uploadPartnerAvatar(id, file);
+      const next = partners.map((p) => (p.id === id ? { ...p, avatarUrl: url } : p));
+      syncPartners(next);
+      showMessage("头像已更新");
+    } catch (error) {
+      showMessage(error instanceof Error ? error.message : "头像上传失败", "error");
+    } finally {
+      setSavingId(null);
+      if (rowFileRefs.current[id]) rowFileRefs.current[id]!.value = "";
+    }
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm("确定删除这个合作伙伴吗？")) return;
+    setSavingId(id);
+    try {
+      await api.deletePartner(id);
+      const next = partners.filter((p) => p.id !== id);
+      syncPartners(next);
+      setEditing((prev) => {
+        const clone = { ...prev };
+        delete clone[id];
+        return clone;
+      });
+      showMessage("伙伴已删除");
+    } catch (error) {
+      showMessage(error instanceof Error ? error.message : "删除失败", "error");
+    } finally {
+      setSavingId(null);
+    }
+  }
+
+  if (loading) return <p>加载中...</p>;
+
+  return (
+    <div className="admin-partner-manager">
+      <form className="admin-partner-create" onSubmit={handleCreate}>
+        <button
+          type="button"
+          className="admin-partner-avatar-upload"
+          onClick={() => createFileRef.current?.click()}
+          aria-label="上传合作伙伴头像"
+        >
+          {draftAvatarPreview ? <img src={draftAvatarPreview} alt="" /> : <span>+</span>}
+        </button>
+        <input
+          ref={createFileRef}
+          type="file"
+          accept="image/*"
+          hidden
+          onChange={handleDraftAvatar}
+        />
+        <label>
+          <span>昵称</span>
+          <input
+            value={draftName}
+            placeholder="例如：xiaoli"
+            onChange={(e) => setDraftName(e.target.value)}
+            required
+          />
+        </label>
+        <label>
+          <span>个人博客网站</span>
+          <input
+            type="text"
+            inputMode="url"
+            value={draftWebsite}
+            placeholder="https://example.com"
+            onChange={(e) => setDraftWebsite(e.target.value)}
+          />
+        </label>
+        <button type="submit" disabled={creating}>
+          {creating ? "添加中..." : "+ 添加"}
+        </button>
+      </form>
+
+      <div className="admin-partner-list">
+        <div className="admin-project-list-header">
+          <strong>合作伙伴 ({partners.length})</strong>
+        </div>
+        {partners.length === 0 && (
+          <p className="admin-project-empty">暂无合作伙伴，先上传一个头像吧。</p>
+        )}
+        {partners.map((partner) => {
+          const form = editing[partner.id] ?? { name: partner.name, websiteUrl: partner.websiteUrl };
+          const isSaving = savingId === partner.id;
+          return (
+            <div key={partner.id} className="admin-partner-row">
+              <button
+                type="button"
+                className="admin-partner-avatar"
+                onClick={() => rowFileRefs.current[partner.id]?.click()}
+                aria-label={`更换 ${partner.name} 的头像`}
+                disabled={isSaving}
+              >
+                <img src={partner.avatarUrl} alt="" />
+              </button>
+              <input
+                ref={(node) => { rowFileRefs.current[partner.id] = node; }}
+                type="file"
+                accept="image/*"
+                hidden
+                onChange={(e) => handleAvatar(partner.id, e)}
+              />
+              <label>
+                <span>昵称</span>
+                <input
+                  value={form.name}
+                  onChange={(e) => updateEditing(partner.id, { name: e.target.value })}
+                />
+              </label>
+              <label>
+                <span>网站</span>
+                <input
+                  type="text"
+                  inputMode="url"
+                  value={form.websiteUrl}
+                  placeholder="https://example.com"
+                  onChange={(e) => updateEditing(partner.id, { websiteUrl: e.target.value })}
+                />
+              </label>
+              <div className="admin-project-actions">
+                <button type="button" onClick={() => handleSave(partner)} disabled={isSaving}>
+                  保存
+                </button>
+                <button
+                  type="button"
+                  className="danger"
+                  onClick={() => handleDelete(partner.id)}
+                  disabled={isSaving}
+                >
+                  删除
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {msg && <span className={`admin-panel-msg ${msgType === "error" ? "admin-panel-msg-error" : ""}`}>{msg}</span>}
     </div>
   );
 }

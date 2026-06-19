@@ -1,6 +1,7 @@
 package http
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"os"
@@ -33,6 +34,17 @@ func publicProjectsHandler(db *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
+func publicProjectSummariesHandler(db *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		summaries, err := repository.ListProjectSummaries(r.Context(), db)
+		if err != nil {
+			RespondError(w, "LIST_FAILED", "failed to list projects", http.StatusInternalServerError)
+			return
+		}
+		RespondOK(w, summaries)
+	}
+}
+
 func getProjectBySlugHandler(db *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		slug := chi.URLParam(r, "slug")
@@ -42,6 +54,66 @@ func getProjectBySlugHandler(db *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		RespondOK(w, project)
+	}
+}
+
+func projectIconHandler(db *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+		iconURL, err := repository.GetProjectIconURL(r.Context(), db, id)
+		if err != nil || !strings.HasPrefix(iconURL, "data:") {
+			RespondError(w, "NOT_FOUND", "project icon not found", http.StatusNotFound)
+			return
+		}
+
+		header, encoded, ok := strings.Cut(iconURL, ",")
+		if !ok || !strings.Contains(header, ";base64") {
+			RespondError(w, "INVALID_ICON", "project icon is invalid", http.StatusBadRequest)
+			return
+		}
+		mimeType := strings.TrimPrefix(strings.Split(header, ";")[0], "data:")
+		if mimeType == "" || !strings.HasPrefix(mimeType, "image/") {
+			RespondError(w, "INVALID_ICON", "project icon is invalid", http.StatusBadRequest)
+			return
+		}
+
+		data, err := base64.StdEncoding.DecodeString(encoded)
+		if err != nil {
+			RespondError(w, "INVALID_ICON", "project icon is invalid", http.StatusBadRequest)
+			return
+		}
+
+		body, contentType := compressProjectIconResponse(data, mimeType)
+		w.Header().Set("Content-Type", contentType)
+		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(body)
+	}
+}
+
+func compressProjectIconResponse(data []byte, mimeType string) ([]byte, string) {
+	ext, ok := allowedMimeTypes[mimeType]
+	if !ok || ext == ".gif" {
+		return data, mimeType
+	}
+
+	compressed, newExt, err := compressImage(data, ext, 640, 82)
+	if err != nil || len(compressed) >= len(data) {
+		return data, mimeType
+	}
+	return compressed, contentTypeForImageExt(newExt, mimeType)
+}
+
+func contentTypeForImageExt(ext string, fallback string) string {
+	switch ext {
+	case ".jpg", ".jpeg":
+		return "image/jpeg"
+	case ".png":
+		return "image/png"
+	case ".webp":
+		return "image/webp"
+	default:
+		return fallback
 	}
 }
 

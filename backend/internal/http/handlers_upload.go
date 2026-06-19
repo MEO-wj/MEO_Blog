@@ -190,9 +190,9 @@ func compressImage(data []byte, ext string, maxDimension int, jpegQuality int) (
 		ext = ".jpg"
 	}
 
-	// Default: JPEG with quality 80
+	// Default: JPEG with configured quality.
 	var buf bytes.Buffer
-	if err := jpeg.Encode(&buf, src, &jpeg.Options{Quality: 80}); err != nil {
+	if err := jpeg.Encode(&buf, src, &jpeg.Options{Quality: jpegQuality}); err != nil {
 		return nil, "", err
 	}
 	return buf.Bytes(), ext, nil

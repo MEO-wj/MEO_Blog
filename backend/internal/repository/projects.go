@@ -117,7 +117,7 @@ func ListProjects(ctx context.Context, db *pgxpool.Pool) ([]Project, error) {
 }
 
 const projectSummaryCols = `id, name, slug,
-	coalesce(cover_url,''), coalesce(icon_url,''),
+	'', CASE WHEN coalesce(icon_url,'') LIKE 'data:%' THEN '/api/v1/project-icons/' || id::text || '?v=' || (extract(epoch FROM updated_at)::bigint)::text ELSE coalesce(icon_url,'') END,
 	coalesce(accent_color,'#24c9f4'), coalesce(category,''),
 	coalesce(status,'ready'), pinned, sort_order, created_at, updated_at`
 

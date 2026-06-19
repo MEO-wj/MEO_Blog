@@ -25,6 +25,7 @@ export function GitHubProfile({ username, onClose }: GitHubProfileProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [retryCount, setRetryCount] = useState(0);
+  const [selectedContributionIndex, setSelectedContributionIndex] = useState<number | null>(null);
   const scrollRef = useWheelScroll<HTMLDivElement>();
 
   useEffect(() => {
@@ -33,6 +34,7 @@ export function GitHubProfile({ username, onClose }: GitHubProfileProps) {
     async function fetchData() {
       setLoading(true);
       setError("");
+      setSelectedContributionIndex(null);
       try {
         const [ghData, contribData] = await Promise.all([
           api.getGithubUser(username).catch(() => null),
@@ -93,6 +95,15 @@ export function GitHubProfile({ username, onClose }: GitHubProfileProps) {
     return `${Math.floor(months / 12)} 年前`;
   }
 
+  function formatContributionDate(dateStr: string): string {
+    const date = new Date(`${dateStr}T00:00:00`);
+    if (Number.isNaN(date.getTime())) return dateStr;
+    return date.toLocaleDateString("zh-CN", {
+      month: "long",
+      day: "numeric",
+    });
+  }
+
   if (loading) {
     return (
       <div className="gh-profile-backdrop" onClick={onClose}>
@@ -120,7 +131,14 @@ export function GitHubProfile({ username, onClose }: GitHubProfileProps) {
 
   return (
     <div className="gh-profile-backdrop" onClick={onClose}>
-      <div ref={scrollRef} className="gh-profile-card" onClick={(e) => e.stopPropagation()}>
+      <div
+        ref={scrollRef}
+        className="gh-profile-card"
+        onClick={(e) => {
+          e.stopPropagation();
+          setSelectedContributionIndex(null);
+        }}
+      >
         <button className="gh-profile-close" type="button" aria-label="关闭" onClick={onClose}>×</button>
 
         {/* Header: user info + contributions side by side */}
@@ -176,17 +194,38 @@ export function GitHubProfile({ username, onClose }: GitHubProfileProps) {
               </h3>
               <div className="gh-profile-contrib">
                 <div className="gh-profile-contrib-grid">
-                  {contributions.map((day, i) => (
-                    <div
-                      key={day.date}
-                      className={`gh-profile-contrib-cell${day.level > 0 ? " gh-contrib-active" : ""}`}
-                      style={{
-                        background: CONTRIBUTION_COLORS[day.level],
-                        animationDelay: day.level > 0 ? `${(i % 7) * 0.15}s` : undefined,
-                      }}
-                      title={`${day.date}: ${day.count} 次提交`}
-                    />
-                  ))}
+                  {contributions.map((day, i) => {
+                    const selected = selectedContributionIndex === i;
+                    const label = day.date
+                      ? `${formatContributionDate(day.date)}：${day.count} 次提交`
+                      : "无提交数据";
+                    return (
+                      <button
+                        key={day.date || `empty-${i}`}
+                        type="button"
+                        className={`gh-profile-contrib-cell${day.level > 0 ? " gh-contrib-active" : ""}${selected ? " gh-contrib-selected" : ""}`}
+                        style={{
+                          background: CONTRIBUTION_COLORS[day.level],
+                          animationDelay: day.level > 0 ? `${(i % 7) * 0.15}s` : undefined,
+                        }}
+                        title={label}
+                        aria-label={label}
+                        aria-pressed={selected}
+                        disabled={!day.date}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedContributionIndex(i);
+                        }}
+                      >
+                        {selected && (
+                          <span className="gh-profile-contrib-popover" role="status">
+                            <span className="gh-profile-contrib-date">{formatContributionDate(day.date)}</span>
+                            <strong className="gh-profile-contrib-count">{day.count} 次提交</strong>
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
                 <div className="gh-profile-contrib-legend">
                   <span>少</span>

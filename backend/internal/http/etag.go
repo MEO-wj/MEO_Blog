@@ -118,6 +118,17 @@ func computeFavoritesETag(ctx context.Context, db *pgxpool.Pool) (string, error)
 	return fmt.Sprintf(`W/"favorites-%d-%d-%s"`, count, ts, fingerprint), nil
 }
 
+func computePartnersETag(ctx context.Context, db *pgxpool.Pool) (string, error) {
+	var count, ts int64
+	err := db.QueryRow(ctx,
+		`SELECT count(*), COALESCE(EXTRACT(EPOCH FROM max(updated_at))::bigint, 0) FROM partners`,
+	).Scan(&count, &ts)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf(`W/"partners-%d-%d"`, count, ts), nil
+}
+
 func computeBlogCategoriesETag(ctx context.Context, db *pgxpool.Pool) (string, error) {
 	var count, ts int64
 	err := db.QueryRow(ctx,

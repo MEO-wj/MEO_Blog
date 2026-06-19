@@ -11,6 +11,12 @@ const ProjectsPage = lazy(() => import("./features/projects/ProjectsPage").then(
 const GamesPage = lazy(() => import("./features/games/GamesPage").then(m => ({ default: m.GamesPage })));
 const AboutPage = lazy(() => import("./features/about/AboutPage").then(m => ({ default: m.AboutPage })));
 
+const MOBILE_HOME_MEDIA = "(max-width: 760px), (pointer: coarse) and (max-width: 1024px)";
+
+function shouldUseMobileHome() {
+  return window.matchMedia(MOBILE_HOME_MEDIA).matches;
+}
+
 function PageLoader() {
   return <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "#8a9bbd" }}>加载中...</div>;
 }
@@ -38,13 +44,13 @@ function RootLoader() {
 }
 
 function useIsMobileHome() {
-  const [isMobile, setIsMobile] = useState(() =>
-    window.matchMedia("(max-width: 760px)").matches,
-  );
+  const [isMobile, setIsMobile] = useState(shouldUseMobileHome);
 
   useEffect(() => {
-    const media = window.matchMedia("(max-width: 760px)");
-    const onChange = () => setIsMobile(media.matches);
+    const media = window.matchMedia(MOBILE_HOME_MEDIA);
+    const onChange = () => {
+      if (media.matches) setIsMobile(true);
+    };
 
     onChange();
     media.addEventListener("change", onChange);

@@ -15,10 +15,7 @@ const PATH_OVERRIDES: Record<string, string> = {
   "nintendo-switch-handheld-split": "/model/Switch/nintendo_switch_handheld_split.glb",
   "nintendo-switch-dock-set-split": "/model/Switch/nintendo_switch_dock_set_split.glb",
   "sci-fi-table": "/model/Scene/sci-fi_table.glb",
-  "sofa": "/model/Scene/sofa.glb",
   "trestle2": "/model/Scene/trestle2.glb",
-  "karaoke-piranha-plant": "/model/Scene/karaoke_piranha_plant.glb",
-  "small-cabinet-right-gray": "/model/Scene/small_cabinet_right_gray.glb",
 };
 
 export function resolveAssetPath(item: LayoutItem): string {

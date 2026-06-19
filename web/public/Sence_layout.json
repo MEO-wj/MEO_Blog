@@ -126,28 +126,6 @@
       }
     },
     {
-      "id": "sofa",
-      "assetKey": "public__models__Scene__sofa",
-      "label": "Sofa",
-      "path": "/public/models/Scene/sofa.glb",
-      "parentId": "sci-fi-table",
-      "position": {
-        "x": 0,
-        "y": 0.125,
-        "z": 1.247
-      },
-      "rotationDeg": {
-        "x": 180,
-        "y": -15,
-        "z": 180
-      },
-      "scale": {
-        "x": -0.001,
-        "y": 0.001,
-        "z": 0.001
-      }
-    },
-    {
       "id": "trestle2",
       "assetKey": "public__models__Scene__trestle2",
       "label": "TRESTLE2",
@@ -167,50 +145,6 @@
         "x": -1.816,
         "y": 1.816,
         "z": 1.816
-      }
-    },
-    {
-      "id": "karaoke-piranha-plant",
-      "assetKey": "public__models__Switch__karaoke_piranha_plant",
-      "label": "Karaoke Piranha Plant",
-      "path": "/public/models/Switch/karaoke_piranha_plant.glb",
-      "parentId": null,
-      "position": {
-        "x": 12.75,
-        "y": 1.89,
-        "z": -4.5
-      },
-      "rotationDeg": {
-        "x": -180,
-        "y": 0,
-        "z": 0
-      },
-      "scale": {
-        "x": -0.034,
-        "y": -0.031,
-        "z": -0.034
-      }
-    },
-    {
-      "id": "small-cabinet-right-gray",
-      "assetKey": "public__models__Scene__small_cabinet_right_gray",
-      "label": "Small Cabinet Right Gray",
-      "path": "/public/models/Scene/small_cabinet_right_gray.glb",
-      "parentId": null,
-      "position": {
-        "x": -8,
-        "y": 2.5,
-        "z": -1.25
-      },
-      "rotationDeg": {
-        "x": -180,
-        "y": 0,
-        "z": -180
-      },
-      "scale": {
-        "x": 0.308,
-        "y": 0.308,
-        "z": 0.308
       }
     }
   ]

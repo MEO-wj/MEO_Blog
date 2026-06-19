@@ -25,6 +25,8 @@ func NewRouter(cfg *config.Config, db *pgxpool.Pool, rdb *redis.Client) http.Han
 		r.Get("/admin/session", adminSessionHandler(cfg, rdb))
 		r.Post("/admin/logout", adminLogoutHandler(cfg, rdb))
 
+		r.Get("/projects/summary", publicProjectSummariesHandler(db))
+		r.Get("/project-icons/{id}", projectIconHandler(db))
 		r.With(ETagMiddleware(computeProjectsETag, db, "projects")).Get("/projects", publicProjectsHandler(db))
 		r.With(ETagMiddleware(computeProjectDetailETag, db, "project-detail")).Get("/projects/{slug}", getProjectBySlugHandler(db))
 		r.With(ETagMiddleware(computeProfileETag, db, "profile")).Get("/profile", publicProfileHandler(db))
@@ -42,6 +44,7 @@ func NewRouter(cfg *config.Config, db *pgxpool.Pool, rdb *redis.Client) http.Han
 
 		r.With(ETagMiddleware(computeResumeETag, db, "resume")).Get("/resume", getResumeHandler(db))
 		r.With(ETagMiddleware(computeFavoritesETag, db, "favorites")).Get("/favorites", listFavoritesHandler(db))
+		r.With(ETagMiddleware(computePartnersETag, db, "partners")).Get("/partners", listPartnersHandler(db))
 
 		r.Get("/github/{username}", githubUserHandler(cfg))
 		r.Get("/github/{username}/contributions", githubContributionsHandler(cfg))
@@ -57,6 +60,11 @@ func NewRouter(cfg *config.Config, db *pgxpool.Pool, rdb *redis.Client) http.Han
 			r.Post("/admin/favorites", adminCreateFavoriteHandler(db, cfg))
 			r.Patch("/admin/favorites/{id}/position", adminUpdateFavoritePositionHandler(db))
 			r.Delete("/admin/favorites/{id}", adminDeleteFavoriteHandler(db, cfg))
+
+			r.Post("/admin/partners", adminCreatePartnerHandler(db, cfg))
+			r.Put("/admin/partners/{id}", adminUpdatePartnerHandler(db))
+			r.Post("/admin/partners/{id}/avatar", adminUploadPartnerAvatarHandler(db, cfg))
+			r.Delete("/admin/partners/{id}", adminDeletePartnerHandler(db, cfg))
 
 			r.Post("/admin/projects", createProjectHandler(db))
 			r.Put("/admin/projects/reorder", adminReorderProjectsHandler(db))

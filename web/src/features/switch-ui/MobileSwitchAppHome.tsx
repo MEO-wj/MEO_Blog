@@ -16,6 +16,7 @@ import { GitHubProfile } from "./GitHubProfile";
 import { Icon, type IconName } from "./Icon";
 import { MessageWallModal } from "./MessageWallModal";
 import { MobileActionDock } from "./MobileActionDock";
+import { MobileBlogReader } from "./MobileBlogReader";
 import { ProjectDetail } from "./ProjectDetail";
 import { ResumeModal } from "./ResumeModal";
 import { SaveToast } from "./SaveToast";
@@ -46,12 +47,13 @@ const ADMIN_GATE_CODE_PARTS: Record<AdminGateKey, string> = {
   y: "Y",
 };
 
-const MOBILE_DOCK_ACTION_IDS = ["github-home", "resume", "contact"];
-const MOBILE_SPACE_ACTION_IDS = ["github-home", "resume", "contact"];
+const MOBILE_DOCK_ACTION_IDS = ["github-home", "blog", "resume", "contact"];
+const MOBILE_SPACE_ACTION_IDS = ["github-home", "blog", "resume", "contact"];
 const MOBILE_PROJECT_SKELETON_COUNT = 4;
 
 const MOBILE_ACTION_LABELS: Record<string, string> = {
   "github-home": "GitHub",
+  blog: "博客",
   resume: "简历",
   contact: "留言",
   admin: "管理后台",
@@ -60,6 +62,7 @@ const MOBILE_ACTION_LABELS: Record<string, string> = {
 
 const MOBILE_ACTION_SUBTITLES: Record<string, string> = {
   "github-home": "代码主页",
+  blog: "文章仓库",
   resume: "个人履历",
   contact: "留言墙",
 };
@@ -108,6 +111,7 @@ export function MobileSwitchAppHome() {
   const [detailProject, setDetailProject] = useState<Project | SwitchHomeProject | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [showGithub, setShowGithub] = useState(false);
+  const [showBlog, setShowBlog] = useState(false);
   const [showGuestbook, setShowGuestbook] = useState(false);
   const [showResume, setShowResume] = useState(false);
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
@@ -355,6 +359,11 @@ export function MobileSwitchAppHome() {
 
     if (actionId === "resume") {
       setShowResume(true);
+      return;
+    }
+
+    if (actionId === "blog") {
+      setShowBlog(true);
       return;
     }
 
@@ -644,6 +653,11 @@ export function MobileSwitchAppHome() {
           document.body,
         ) : null;
       })()}
+
+      {showBlog && createPortal(
+        <MobileBlogReader onClose={() => { playSound("close"); setShowBlog(false); }} />,
+        document.body,
+      )}
 
       {showGuestbook && createPortal(
         <MessageWallModal onClose={() => { playSound("close"); setShowGuestbook(false); }} />,

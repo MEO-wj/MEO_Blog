@@ -172,7 +172,9 @@ func computeBlogPostDetailETag(ctx context.Context, db *pgxpool.Pool) (string, e
 func computeGuestbookETag(ctx context.Context, db *pgxpool.Pool) (string, error) {
 	var count, ts int64
 	err := db.QueryRow(ctx,
-		`SELECT count(*), COALESCE(EXTRACT(EPOCH FROM max(created_at))::bigint, 0) FROM guestbook_messages`,
+		`SELECT count(*), COALESCE(EXTRACT(EPOCH FROM max(created_at))::bigint, 0)
+		 FROM guestbook_messages
+		 WHERE moderation_status = 'published'`,
 	).Scan(&count, &ts)
 	if err != nil {
 		return "", err

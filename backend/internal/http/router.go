@@ -84,6 +84,8 @@ func NewRouter(cfg *config.Config, db *pgxpool.Pool, rdb *redis.Client) http.Han
 			r.Delete("/admin/blog/posts/{id}", adminDeleteBlogPostHandler(db))
 			r.Delete("/admin/blog/comments/{id}", adminDeleteBlogCommentHandler(db))
 
+			r.Get("/admin/guestbook/moderation", adminGuestbookModerationHandler(db))
+			r.Post("/admin/guestbook/messages/{id}/publish", adminPublishGuestbookMessageHandler(db))
 			r.Post("/admin/guestbook/messages/{id}/replies", adminReplyGuestbookHandler(db))
 			r.Delete("/admin/guestbook/messages/{id}", adminDeleteGuestbookMessageHandler(db))
 			r.Delete("/admin/guestbook/replies/{id}", adminDeleteGuestbookReplyHandler(db))

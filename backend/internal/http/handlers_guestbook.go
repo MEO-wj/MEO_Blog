@@ -188,6 +188,32 @@ func adminReplyGuestbookHandler(db *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
+func adminGuestbookModerationHandler(db *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		queue, err := repository.GetGuestbookModerationQueue(r.Context(), db)
+		if err != nil {
+			slog.Error("list guestbook moderation queue failed", "error", err)
+			RespondError(w, "LIST_FAILED", "failed to list moderation queue", http.StatusInternalServerError)
+			return
+		}
+		RespondOK(w, queue)
+	}
+}
+
+func adminPublishGuestbookMessageHandler(db *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+		msg, err := repository.PublishGuestbookMessage(r.Context(), db, id)
+		if err != nil {
+			slog.Error("publish guestbook message failed", "error", err, "id", id)
+			RespondError(w, "UPDATE_FAILED", "failed to publish message", http.StatusInternalServerError)
+			return
+		}
+		InvalidateETagCache("guestbook")
+		RespondOK(w, msg)
+	}
+}
+
 func adminDeleteGuestbookMessageHandler(db *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")

@@ -19,9 +19,20 @@ type GuestbookMessage struct {
 	IsAdminReply     bool               `json:"isAdminReply"`
 	AdminDisplayName string             `json:"adminDisplayName,omitempty"`
 	AdminAvatarURL   string             `json:"adminAvatarUrl,omitempty"`
+	ModerationStatus string             `json:"moderationStatus"`
 	CreatedAt        string             `json:"createdAt"`
 	CanDelete        bool               `json:"canDelete"`
 	Replies          []GuestbookMessage `json:"replies,omitempty"`
+}
+
+type GuestbookModerationStats struct {
+	Pending   int `json:"pending"`
+	Published int `json:"published"`
+}
+
+type GuestbookModerationQueue struct {
+	Stats    GuestbookModerationStats `json:"stats"`
+	Messages []GuestbookMessage       `json:"messages"`
 }
 
 type GuestbookMessageCreate struct {
@@ -37,7 +48,8 @@ type GuestbookReplyCreate struct {
 }
 
 const guestbookSelectCols = `id, nickname, coalesce(avatar_url,''), content,
-	parent_id, is_admin_reply, coalesce(admin_display_name,''), coalesce(admin_avatar_url,''), created_at`
+	parent_id, is_admin_reply, coalesce(admin_display_name,''), coalesce(admin_avatar_url,''),
+	moderation_status, created_at`
 
 func scanGuestbookMessageWithIP(row pgx.Row, clientIP string) (*GuestbookMessage, error) {
 	var m GuestbookMessage
@@ -45,7 +57,7 @@ func scanGuestbookMessageWithIP(row pgx.Row, clientIP string) (*GuestbookMessage
 	var ip *string
 	err := row.Scan(
 		&m.ID, &m.Nickname, &m.AvatarURL, &m.Content,
-		&m.ParentID, &m.IsAdminReply, &m.AdminDisplayName, &m.AdminAvatarURL, &createdAt, &ip,
+		&m.ParentID, &m.IsAdminReply, &m.AdminDisplayName, &m.AdminAvatarURL, &m.ModerationStatus, &createdAt, &ip,
 	)
 	if err != nil {
 		return nil, err
@@ -62,7 +74,7 @@ func scanGuestbookMessage(row pgx.Row) (*GuestbookMessage, error) {
 	var createdAt time.Time
 	err := row.Scan(
 		&m.ID, &m.Nickname, &m.AvatarURL, &m.Content,
-		&m.ParentID, &m.IsAdminReply, &m.AdminDisplayName, &m.AdminAvatarURL, &createdAt,
+		&m.ParentID, &m.IsAdminReply, &m.AdminDisplayName, &m.AdminAvatarURL, &m.ModerationStatus, &createdAt,
 	)
 	if err != nil {
 		return nil, err
@@ -77,6 +89,7 @@ func ListGuestbookMessages(ctx context.Context, db *pgxpool.Pool, clientIP strin
 		`SELECT `+guestbookSelectCols+`, coalesce(cast(ip_address as text),'')
 		 FROM guestbook_messages
 		 WHERE parent_id IS NULL
+		   AND moderation_status = 'published'
 		 ORDER BY created_at DESC
 		 LIMIT 100`,
 	)
@@ -106,6 +119,7 @@ func ListGuestbookMessages(ctx context.Context, db *pgxpool.Pool, clientIP strin
 		`SELECT `+guestbookSelectCols+`, coalesce(cast(ip_address as text),'')
 		 FROM guestbook_messages
 		 WHERE parent_id IS NOT NULL
+		   AND moderation_status = 'published'
 		 ORDER BY created_at ASC
 		 LIMIT 500`,
 	)
@@ -140,8 +154,8 @@ func ListGuestbookMessages(ctx context.Context, db *pgxpool.Pool, clientIP strin
 
 func CreateGuestbookMessage(ctx context.Context, db *pgxpool.Pool, clientIP string, c *GuestbookMessageCreate) (*GuestbookMessage, error) {
 	return scanGuestbookMessage(db.QueryRow(ctx,
-		`INSERT INTO guestbook_messages (nickname, avatar_url, content, ip_address)
-		 VALUES ($1, $2, $3, $4::inet)
+		`INSERT INTO guestbook_messages (nickname, avatar_url, content, ip_address, moderation_status)
+		 VALUES ($1, $2, $3, $4::inet, 'pending')
 		 RETURNING `+guestbookSelectCols,
 		c.Nickname, c.AvatarURL, c.Content, clientIP,
 	))
@@ -149,8 +163,8 @@ func CreateGuestbookMessage(ctx context.Context, db *pgxpool.Pool, clientIP stri
 
 func CreateGuestbookReply(ctx context.Context, db *pgxpool.Pool, messageID string, c *GuestbookReplyCreate) (*GuestbookMessage, error) {
 	return scanGuestbookMessage(db.QueryRow(ctx,
-		`INSERT INTO guestbook_messages (nickname, content, parent_id, is_admin_reply, admin_display_name, admin_avatar_url)
-		 VALUES ($1, $2, $3, true, $4, $5)
+		`INSERT INTO guestbook_messages (nickname, content, parent_id, is_admin_reply, admin_display_name, admin_avatar_url, moderation_status, reviewed_at)
+		 VALUES ($1, $2, $3, true, $4, $5, 'published', now())
 		 RETURNING `+guestbookSelectCols,
 		c.AdminDisplayName, c.Content, messageID, c.AdminDisplayName, c.AdminAvatarURL,
 	))
@@ -158,10 +172,70 @@ func CreateGuestbookReply(ctx context.Context, db *pgxpool.Pool, messageID strin
 
 func CreateGuestbookUserReply(ctx context.Context, db *pgxpool.Pool, messageID, nickname, content, clientIP string) (*GuestbookMessage, error) {
 	return scanGuestbookMessage(db.QueryRow(ctx,
-		`INSERT INTO guestbook_messages (nickname, content, parent_id, ip_address)
-		 VALUES ($1, $2, $3, $4::inet)
+		`INSERT INTO guestbook_messages (nickname, content, parent_id, ip_address, moderation_status)
+		 VALUES ($1, $2, $3, $4::inet, 'pending')
 		 RETURNING `+guestbookSelectCols,
 		nickname, content, messageID, clientIP,
+	))
+}
+
+func GetGuestbookModerationStats(ctx context.Context, db *pgxpool.Pool) (GuestbookModerationStats, error) {
+	var stats GuestbookModerationStats
+	err := db.QueryRow(ctx,
+		`SELECT
+		 count(*) FILTER (WHERE moderation_status = 'pending')::int,
+		 count(*) FILTER (WHERE moderation_status = 'published')::int
+		 FROM guestbook_messages`,
+	).Scan(&stats.Pending, &stats.Published)
+	return stats, err
+}
+
+func ListPendingGuestbookMessages(ctx context.Context, db *pgxpool.Pool) ([]GuestbookMessage, error) {
+	rows, err := db.Query(ctx,
+		`SELECT `+guestbookSelectCols+`
+		 FROM guestbook_messages
+		 WHERE moderation_status = 'pending'
+		 ORDER BY created_at DESC
+		 LIMIT 100`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	messages := []GuestbookMessage{}
+	for rows.Next() {
+		m, err := scanGuestbookMessage(rows)
+		if err != nil {
+			return nil, err
+		}
+		messages = append(messages, *m)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return messages, nil
+}
+
+func GetGuestbookModerationQueue(ctx context.Context, db *pgxpool.Pool) (GuestbookModerationQueue, error) {
+	stats, err := GetGuestbookModerationStats(ctx, db)
+	if err != nil {
+		return GuestbookModerationQueue{}, err
+	}
+	messages, err := ListPendingGuestbookMessages(ctx, db)
+	if err != nil {
+		return GuestbookModerationQueue{}, err
+	}
+	return GuestbookModerationQueue{Stats: stats, Messages: messages}, nil
+}
+
+func PublishGuestbookMessage(ctx context.Context, db *pgxpool.Pool, id string) (*GuestbookMessage, error) {
+	return scanGuestbookMessage(db.QueryRow(ctx,
+		`UPDATE guestbook_messages
+		 SET moderation_status = 'published', reviewed_at = now()
+		 WHERE id = $1
+		 RETURNING `+guestbookSelectCols,
+		id,
 	))
 }
 

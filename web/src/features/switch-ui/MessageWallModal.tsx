@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { api } from "../../api/client";
-import type { GuestbookMessage, GuestbookMessageCreate } from "../../api/types";
+import type { GuestbookMessage, GuestbookMessageCreate, GuestbookModerationStats } from "../../api/types";
 import { useAdminStore } from "../../stores/adminStore";
 import { useWheelScroll } from "./useWheelScroll";
 
@@ -91,6 +91,12 @@ export function MessageWallModal({ onClose }: MessageWallModalProps) {
   const [replyContent, setReplyContent] = useState("");
   const [replySubmitting, setReplySubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [moderationOpen, setModerationOpen] = useState(false);
+  const [moderationLoading, setModerationLoading] = useState(false);
+  const [pendingMessages, setPendingMessages] = useState<GuestbookMessage[]>([]);
+  const [moderationStats, setModerationStats] = useState<GuestbookModerationStats>({ pending: 0, published: 0 });
+  const [moderatingId, setModeratingId] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const scrollRef = useWheelScroll<HTMLDivElement>();
   const contentRef = useRef<HTMLTextAreaElement>(null);
@@ -108,6 +114,32 @@ export function MessageWallModal({ onClose }: MessageWallModalProps) {
       setError("加载失败，请检查网络");
     });
   }, [retryCount]);
+
+  useEffect(() => {
+    if (!isAdmin) {
+      setModerationOpen(false);
+      setPendingMessages([]);
+      setModerationStats({ pending: 0, published: 0 });
+      return;
+    }
+    let cancelled = false;
+    setModerationLoading(true);
+    api.getGuestbookModeration()
+      .then((queue) => {
+        if (cancelled) return;
+        setPendingMessages(queue.messages);
+        setModerationStats(queue.stats);
+      })
+      .catch(() => {
+        if (!cancelled) setNotice("审核列表加载失败");
+      })
+      .finally(() => {
+        if (!cancelled) setModerationLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isAdmin, retryCount]);
 
   useEffect(() => {
     if (contentRef.current) {
@@ -128,8 +160,8 @@ export function MessageWallModal({ onClose }: MessageWallModalProps) {
       const { message: msg, ownerToken } = await api.createGuestbookMessage(data);
       writeOwnerToken(msg.id, ownerToken);
       msg.canDelete = true;
-      setMessages((prev) => [msg, ...prev]);
       setContent("");
+      setNotice("留言已提交，审核通过后会显示在留言墙上");
       localStorage.setItem("guestbook_nickname", nickname.trim());
       if (scrollRef.current) scrollRef.current.scrollTop = 0;
     } catch {
@@ -163,14 +195,7 @@ export function MessageWallModal({ onClose }: MessageWallModalProps) {
           content: replyContent.trim(),
         });
         writeOwnerToken(reply.id, ownerToken);
-        reply.canDelete = true;
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === messageId
-              ? { ...m, replies: [...(m.replies || []), reply] }
-              : m
-          )
-        );
+        setNotice("回复已提交，审核通过后会显示");
       }
       setReplyContent("");
       setReplyingTo(null);
@@ -215,18 +240,151 @@ export function MessageWallModal({ onClose }: MessageWallModalProps) {
     }
   }
 
+  async function refreshModeration() {
+    if (!isAdmin) return;
+    setModerationLoading(true);
+    try {
+      const queue = await api.getGuestbookModeration();
+      setPendingMessages(queue.messages);
+      setModerationStats(queue.stats);
+    } catch {
+      setNotice("审核列表加载失败");
+    } finally {
+      setModerationLoading(false);
+    }
+  }
+
+  async function handlePublishPending(id: string) {
+    if (moderatingId) return;
+    setModeratingId(id);
+    try {
+      const published = await api.publishGuestbookMessage(id);
+      setPendingMessages((prev) => prev.filter((m) => m.id !== id));
+      setModerationStats((prev) => ({
+        pending: Math.max(0, prev.pending - 1),
+        published: prev.published + 1,
+      }));
+      if (!published.parentId) {
+        setMessages((prev) => [published, ...prev]);
+      } else {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === published.parentId
+              ? { ...m, replies: [...(m.replies || []), published] }
+              : m
+          )
+        );
+      }
+    } catch {
+      setNotice("审核通过失败");
+    } finally {
+      setModeratingId(null);
+    }
+  }
+
+  async function handleDeletePending(id: string) {
+    if (moderatingId) return;
+    setModeratingId(id);
+    try {
+      await api.deleteGuestbookMessage(id);
+      setPendingMessages((prev) => prev.filter((m) => m.id !== id));
+      setModerationStats((prev) => ({
+        ...prev,
+        pending: Math.max(0, prev.pending - 1),
+      }));
+    } catch {
+      setNotice("删除待审核留言失败");
+    } finally {
+      setModeratingId(null);
+    }
+  }
+
   return (
     <aside className="switch-guestbook-backdrop" onClick={onClose}>
       <div className="switch-guestbook-card" onClick={(e) => e.stopPropagation()}>
         <div className="switch-guestbook-header">
           <span className="switch-guestbook-header-icon">📮</span>
           <strong>留言墙</strong>
+          {isAdmin && (
+            <button
+              className={`switch-guestbook-review-toggle ${moderationOpen ? "is-open" : ""}`}
+              type="button"
+              onClick={() => {
+                setModerationOpen((v) => !v);
+                if (!moderationOpen) void refreshModeration();
+              }}
+            >
+              审核
+              {moderationStats.pending > 0 && <span>{moderationStats.pending}</span>}
+            </button>
+          )}
           <button className="switch-guestbook-close-btn" type="button" aria-label="关闭" onClick={onClose}>
             ×
           </button>
         </div>
 
         <div ref={scrollRef} className="switch-guestbook-body">
+          {notice && (
+            <div className="switch-guestbook-notice">
+              <span>{notice}</span>
+              <button type="button" onClick={() => setNotice(null)}>×</button>
+            </div>
+          )}
+
+          {isAdmin && moderationOpen && (
+            <section className="switch-guestbook-review-panel" aria-label="留言审核">
+              <div className="switch-guestbook-review-stats">
+                <span>
+                  <strong>{moderationStats.pending}</strong>
+                  待审核
+                </span>
+                <span>
+                  <strong>{moderationStats.published}</strong>
+                  已发布
+                </span>
+                <button type="button" onClick={refreshModeration} disabled={moderationLoading}>
+                  {moderationLoading ? "同步中" : "刷新"}
+                </button>
+              </div>
+              {moderationLoading ? (
+                <div className="switch-guestbook-review-empty">正在读取待审核留言...</div>
+              ) : pendingMessages.length === 0 ? (
+                <div className="switch-guestbook-review-empty">没有待审核留言</div>
+              ) : (
+                <div className="switch-guestbook-review-list">
+                  {pendingMessages.map((msg) => (
+                    <article key={msg.id} className="switch-guestbook-review-item">
+                      <div className="switch-guestbook-review-meta">
+                        <PixelAvatar name={msg.nickname} url={msg.avatarUrl} size={30} />
+                        <strong>{msg.nickname}</strong>
+                        {msg.parentId && <span>回复</span>}
+                        <small>{formatTime(msg.createdAt)}</small>
+                      </div>
+                      <p>{msg.content}</p>
+                      <div className="switch-guestbook-review-actions">
+                        <button
+                          type="button"
+                          disabled={moderatingId === msg.id}
+                          onClick={() => handlePublishPending(msg.id)}
+                        >
+                          通过
+                        </button>
+                        <button
+                          type="button"
+                          className="is-danger"
+                          disabled={moderatingId === msg.id}
+                          onClick={() => handleDeletePending(msg.id)}
+                        >
+                          删除
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
+
           {loading ? (
             <div className="switch-guestbook-loading">
               <div className="switch-guestbook-loading-bar" />

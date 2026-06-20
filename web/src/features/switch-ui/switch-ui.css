@@ -1588,20 +1588,31 @@
 .switch-permission-toast {
   position: fixed;
   left: 50%;
-  bottom: 34px;
+  top: max(28px, env(safe-area-inset-top));
   z-index: 10000;
   transform: translateX(-50%);
   border: 1px solid rgba(233, 69, 96, 0.65);
   border-radius: 6px;
-  padding: 10px 18px;
+  padding: 14px 26px;
   color: #fff2f4;
   background: rgba(121, 24, 42, 0.94);
   box-shadow: 0 14px 36px rgba(0, 0, 0, 0.34);
-  font-size: 14px;
-  font-weight: 760;
+  font-size: 18px;
+  font-weight: 820;
   white-space: nowrap;
   pointer-events: none;
-  animation: admin-msg-in 0.22s ease;
+  animation: permission-toast-in 0.24s ease;
+}
+
+@keyframes permission-toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -14px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
 }
 
 .admin-profile-form .admin-bio-textarea {
@@ -3752,6 +3763,46 @@
   text-shadow: 2px 2px 0 #0f3460;
 }
 
+.switch-guestbook-review-toggle {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 2px solid #53d8fb;
+  border-radius: 0;
+  padding: 0 10px;
+  color: #53d8fb;
+  background: #0f3460;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px;
+  cursor: pointer;
+  image-rendering: pixelated;
+  box-shadow: 3px 3px 0 rgba(26, 26, 46, 0.75);
+}
+
+.switch-guestbook-review-toggle:hover,
+.switch-guestbook-review-toggle.is-open {
+  color: #0f3460;
+  background: #53d8fb;
+}
+
+.switch-guestbook-review-toggle:active {
+  transform: translate(1px, 1px);
+  box-shadow: 2px 2px 0 rgba(26, 26, 46, 0.75);
+}
+
+.switch-guestbook-review-toggle span {
+  min-width: 18px;
+  height: 18px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid currentColor;
+  padding-top: 1px;
+  color: #fff;
+  background: #e94560;
+  font-size: 8px;
+}
+
 .switch-guestbook-close-btn {
   width: 28px;
   height: 28px;
@@ -3781,6 +3832,188 @@
   padding: 20px;
   min-height: 0;
   scroll-behavior: smooth;
+}
+
+.switch-guestbook-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 2px solid #53d8fb;
+  border-left: 4px solid #e94560;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  color: #53d8fb;
+  background: rgba(15, 52, 96, 0.72);
+  font-size: 16px;
+  animation: guestbook-note-in 0.2s ease both;
+}
+
+.switch-guestbook-notice button {
+  width: 24px;
+  height: 24px;
+  border: 2px solid #16213e;
+  color: #53d8fb;
+  background: #0f3460;
+  cursor: pointer;
+}
+
+.switch-guestbook-review-panel {
+  border: 3px solid #0f3460;
+  border-left: 4px solid #e94560;
+  margin-bottom: 14px;
+  padding: 12px;
+  background:
+    linear-gradient(135deg, rgba(233, 69, 96, 0.1), transparent 42%),
+    #12122a;
+  box-shadow: inset 0 0 0 2px rgba(83, 216, 251, 0.08);
+  animation: guestbook-note-in 0.22s ease both;
+}
+
+.switch-guestbook-review-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.switch-guestbook-review-stats span,
+.switch-guestbook-review-stats button {
+  min-height: 44px;
+  border: 2px solid #16213e;
+  color: #53d8fb;
+  background: #0f3460;
+}
+
+.switch-guestbook-review-stats span {
+  display: grid;
+  place-items: center;
+  gap: 2px;
+  font-size: 14px;
+}
+
+.switch-guestbook-review-stats strong {
+  color: #e94560;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 12px;
+}
+
+.switch-guestbook-review-stats button {
+  padding: 0 12px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px;
+  cursor: pointer;
+}
+
+.switch-guestbook-review-stats button:hover:not(:disabled) {
+  color: #0f3460;
+  background: #53d8fb;
+}
+
+.switch-guestbook-review-stats button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.switch-guestbook-review-empty {
+  border: 2px dashed rgba(83, 216, 251, 0.34);
+  padding: 18px;
+  color: rgba(83, 216, 251, 0.58);
+  text-align: center;
+  font-size: 15px;
+}
+
+.switch-guestbook-review-list {
+  display: grid;
+  gap: 10px;
+  max-height: 290px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.switch-guestbook-review-item {
+  border: 2px solid #16213e;
+  border-left: 4px solid #53d8fb;
+  padding: 10px;
+  background: rgba(22, 33, 62, 0.92);
+}
+
+.switch-guestbook-review-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.switch-guestbook-review-meta strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #53d8fb;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.switch-guestbook-review-meta span {
+  border: 1px solid rgba(233, 69, 96, 0.45);
+  padding: 1px 6px;
+  color: #e94560;
+  background: rgba(233, 69, 96, 0.12);
+  font-family: 'Press Start 2P', monospace;
+  font-size: 7px;
+}
+
+.switch-guestbook-review-meta small {
+  margin-left: auto;
+  color: rgba(83, 216, 251, 0.4);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.switch-guestbook-review-item p {
+  margin: 0;
+  color: rgba(226, 226, 226, 0.92);
+  font-size: 16px;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.switch-guestbook-review-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.switch-guestbook-review-actions button {
+  border: 2px solid #53d8fb;
+  padding: 5px 12px;
+  color: #53d8fb;
+  background: #0f3460;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px;
+  cursor: pointer;
+}
+
+.switch-guestbook-review-actions button:hover:not(:disabled) {
+  color: #0f3460;
+  background: #53d8fb;
+}
+
+.switch-guestbook-review-actions button.is-danger {
+  border-color: #e94560;
+  color: #e94560;
+}
+
+.switch-guestbook-review-actions button.is-danger:hover:not(:disabled) {
+  color: #fff;
+  background: #e94560;
+}
+
+.switch-guestbook-review-actions button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .switch-guestbook-body::-webkit-scrollbar {
@@ -6471,6 +6704,24 @@
   }
   .switch-guestbook-header strong {
     font-size: 11px;
+  }
+  .switch-guestbook-review-toggle {
+    min-height: 26px;
+    padding: 0 7px;
+    font-size: 7px;
+  }
+  .switch-guestbook-review-stats {
+    grid-template-columns: 1fr 1fr;
+  }
+  .switch-guestbook-review-stats button {
+    grid-column: 1 / -1;
+  }
+  .switch-guestbook-review-meta {
+    flex-wrap: wrap;
+  }
+  .switch-guestbook-review-meta small {
+    width: 100%;
+    margin-left: 38px;
   }
   .switch-guestbook-note-header {
     gap: 8px;

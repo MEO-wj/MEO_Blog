@@ -1,4 +1,4 @@
-import type { APIResponse, AdminProfile, ProfileUpdate, SitePermissions, Project, ProjectSummary, ProjectCreate, ProjectUpdate, GHUser, GHRepo, GHContributions, BlogCategory, BlogCategoryCreate, BlogPost, BlogPostCreate, BlogPostUpdate, BlogComment, BlogCommentCreate, GuestbookMessage, GuestbookMessageCreate, GuestbookOwnerResponse, GuestbookReplyCreate, Favorite, Partner, PartnerUpdate } from "./types";
+import type { APIResponse, AdminProfile, ProfileUpdate, SitePermissions, Project, ProjectSummary, ProjectCreate, ProjectUpdate, GHUser, GHRepo, GHContributions, BlogCategory, BlogCategoryCreate, BlogPost, BlogPostCreate, BlogPostUpdate, BlogComment, BlogCommentCreate, GuestbookMessage, GuestbookMessageCreate, GuestbookModerationQueue, GuestbookOwnerResponse, GuestbookReplyCreate, Favorite, Partner, PartnerUpdate } from "./types";
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? "/api/v1";
 const GET_TIMEOUT_MS = 12000;
@@ -520,6 +520,13 @@ export const api = {
   },
 
   // Guestbook (admin)
+  getGuestbookModeration: () =>
+    request<GuestbookModerationQueue>("/admin/guestbook/moderation", undefined, 2, 0),
+  publishGuestbookMessage: async (id: string) => {
+    const result = await request<GuestbookMessage>(`/admin/guestbook/messages/${id}/publish`, { method: "POST" });
+    invalidateCache("GET:/guestbook/messages");
+    return result;
+  },
   replyToGuestbookMessage: async (id: string, data: GuestbookReplyCreate) => {
     const result = await request<GuestbookMessage>(`/admin/guestbook/messages/${id}/replies`, {
       method: "POST",

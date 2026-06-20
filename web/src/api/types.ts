@@ -244,6 +244,7 @@ export interface GuestbookMessage {
   isAdminReply: boolean;
   adminDisplayName?: string;
   adminAvatarUrl?: string;
+  moderationStatus: "pending" | "published";
   createdAt: string;
   canDelete: boolean;
   replies?: GuestbookMessage[];
@@ -277,4 +278,14 @@ export interface GuestbookReplyCreate {
   content: string;
   adminDisplayName: string;
   adminAvatarUrl?: string;
+}
+
+export interface GuestbookModerationStats {
+  pending: number;
+  published: number;
+}
+
+export interface GuestbookModerationQueue {
+  stats: GuestbookModerationStats;
+  messages: GuestbookMessage[];
 }

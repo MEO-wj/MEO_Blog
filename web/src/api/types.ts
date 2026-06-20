@@ -87,6 +87,14 @@ export interface AdminProfile {
   resumeUrl: string;
 }
 
+export interface SitePermissions {
+  github: boolean;
+  resume: boolean;
+  guestbook: boolean;
+  blog: boolean;
+  favorites: boolean;
+}
+
 export interface Partner {
   id: string;
   name: string;
@@ -258,6 +266,11 @@ export interface GuestbookMessageCreate {
   nickname: string;
   avatarUrl?: string;
   content: string;
+}
+
+export interface GuestbookOwnerResponse {
+  message: GuestbookMessage;
+  ownerToken: string;
 }
 
 export interface GuestbookReplyCreate {

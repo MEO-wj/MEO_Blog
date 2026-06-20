@@ -1,4 +1,4 @@
-import type { APIResponse, AdminProfile, ProfileUpdate, Project, ProjectSummary, ProjectCreate, ProjectUpdate, GHUser, GHRepo, GHContributions, BlogCategory, BlogCategoryCreate, BlogPost, BlogPostCreate, BlogPostUpdate, BlogComment, BlogCommentCreate, GuestbookMessage, GuestbookMessageCreate, GuestbookReplyCreate, Favorite, Partner, PartnerUpdate } from "./types";
+import type { APIResponse, AdminProfile, ProfileUpdate, SitePermissions, Project, ProjectSummary, ProjectCreate, ProjectUpdate, GHUser, GHRepo, GHContributions, BlogCategory, BlogCategoryCreate, BlogPost, BlogPostCreate, BlogPostUpdate, BlogComment, BlogCommentCreate, GuestbookMessage, GuestbookMessageCreate, GuestbookOwnerResponse, GuestbookReplyCreate, Favorite, Partner, PartnerUpdate } from "./types";
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? "/api/v1";
 const GET_TIMEOUT_MS = 12000;
@@ -41,7 +41,8 @@ function getCache(key: string, ttlMs: number): { data: unknown; etag?: string; s
   const entry = getCacheEntry(key);
   if (!entry) return null;
   const stale = Date.now() - entry.timestamp > ttlMs;
-  return { data: entry.data, etag: entry.etag, stale };
+  if (stale) return null;
+  return { data: entry.data, etag: entry.etag, stale: false };
 }
 
 function setCache(key: string, data: unknown, etag?: string): void {
@@ -288,6 +289,23 @@ export const api = {
     return request<{ loggedOut: boolean }>("/admin/logout", { method: "POST" });
   },
 
+  // Public entry permissions
+  getPermissions: () => request<SitePermissions>("/permissions", undefined, 2, 60 * 1000),
+  updatePermissions: async (data: SitePermissions) => {
+    const result = await request<SitePermissions>("/admin/permissions", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+    invalidateCache("GET:/permissions");
+    invalidateCache("GET:/github");
+    invalidateCache("GET:/resume");
+    invalidateCache("GET:/guestbook/messages");
+    invalidateCache("GET:/blog/categories");
+    invalidateCache("GET:/blog/posts");
+    invalidateCache("GET:/favorites");
+    return result;
+  },
+
   // Profile
   getPublicProfile: () => request<AdminProfile>("/profile", undefined, 2, 10 * 60 * 1000),
   getProfile: () => request<AdminProfile>("/admin/profile", undefined, 2, 5 * 60 * 1000),
@@ -477,9 +495,10 @@ export const api = {
   },
 
   // Guestbook (public)
-  getGuestbookMessages: () => request<GuestbookMessage[]>("/guestbook/messages", undefined, 2, 60 * 1000),
+  getGuestbookMessages: () =>
+    requestNetworkAndCache<GuestbookMessage[]>("/guestbook/messages", { cache: "no-cache" }, 2, 60 * 1000),
   createGuestbookMessage: async (data: GuestbookMessageCreate) => {
-    const result = await request<GuestbookMessage>("/guestbook/messages", {
+    const result = await request<GuestbookOwnerResponse>("/guestbook/messages", {
       method: "POST",
       body: JSON.stringify(data),
     });
@@ -487,15 +506,16 @@ export const api = {
     return result;
   },
   replyToGuestbookAsUser: async (id: string, data: { nickname: string; content: string }) => {
-    const result = await request<GuestbookMessage>(`/guestbook/messages/${id}/replies`, {
+    const result = await request<GuestbookOwnerResponse>(`/guestbook/messages/${id}/replies`, {
       method: "POST",
       body: JSON.stringify(data),
     });
     invalidateCache("GET:/guestbook/messages");
     return result;
   },
-  deleteOwnGuestbookMessage: async (id: string) => {
-    await request<void>(`/guestbook/messages/${id}`, { method: "DELETE" });
+  deleteOwnGuestbookMessage: async (id: string, token?: string) => {
+    const qs = token ? `?token=${encodeURIComponent(token)}` : "";
+    await request<void>(`/guestbook/messages/${id}${qs}`, { method: "DELETE" });
     invalidateCache("GET:/guestbook/messages");
   },
 

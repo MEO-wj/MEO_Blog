@@ -19,6 +19,7 @@ import { MobileActionDock } from "./MobileActionDock";
 import { ProjectDetail } from "./ProjectDetail";
 import { ResumeModal } from "./ResumeModal";
 import { SaveToast } from "./SaveToast";
+import { DEFAULT_SITE_PERMISSIONS, isActionAllowed } from "./entryPermissions";
 import {
   switchHomeActions,
   switchHomeProjects,
@@ -116,6 +117,8 @@ export function MobileSwitchAppHome() {
   const [adminAuthMessage, setAdminAuthMessage] = useState("");
   const [sessionChecking, setSessionChecking] = useState(false);
   const [projectsLoading, setProjectsLoading] = useState(true);
+  const [permissions, setPermissions] = useState(DEFAULT_SITE_PERMISSIONS);
+  const [permissionDenied, setPermissionDenied] = useState(false);
 
   useEffect(() => {
     function onSessionExpired() {
@@ -151,10 +154,31 @@ export function MobileSwitchAppHome() {
       })
       .catch(() => {});
 
+    api.getPermissions()
+      .then((p) => {
+        if (!cancelled) setPermissions(p);
+      })
+      .catch(() => {});
+
     return () => {
       cancelled = true;
     };
   }, [setPartners, setProfile, setProjectSummaries]);
+
+  useEffect(() => {
+    function onPermissionsUpdated(event: Event) {
+      const detail = (event as CustomEvent<typeof DEFAULT_SITE_PERMISSIONS>).detail;
+      if (detail) setPermissions(detail);
+    }
+    window.addEventListener("site-permissions-updated", onPermissionsUpdated);
+    return () => window.removeEventListener("site-permissions-updated", onPermissionsUpdated);
+  }, []);
+
+  useEffect(() => {
+    if (!permissionDenied) return;
+    const timer = window.setTimeout(() => setPermissionDenied(false), 1800);
+    return () => window.clearTimeout(timer);
+  }, [permissionDenied]);
 
   const projectItems = useMemo(() => {
     const source = storeProjects.length > 0 ? storeProjects : switchHomeProjects;
@@ -176,14 +200,18 @@ export function MobileSwitchAppHome() {
   const dockActions = useMemo(
     () => MOBILE_DOCK_ACTION_IDS
       .map((id) => switchHomeActions.find((action) => action.id === id))
-      .filter((action): action is (typeof switchHomeActions)[number] => Boolean(action)),
+      .filter((action): action is (typeof switchHomeActions)[number] =>
+        action !== undefined,
+      ),
     [],
   );
 
   const spaceActions = useMemo(
     () => MOBILE_SPACE_ACTION_IDS
       .map((id) => switchHomeActions.find((action) => action.id === id))
-      .filter((action): action is (typeof switchHomeActions)[number] => Boolean(action)),
+      .filter((action): action is (typeof switchHomeActions)[number] =>
+        action !== undefined,
+      ),
     [],
   );
 
@@ -273,13 +301,18 @@ export function MobileSwitchAppHome() {
 
   const openGithubProfile = useCallback(() => {
     setAvatarMenuOpen(false);
+    if (!isAdminAuthenticated && !permissions.github) {
+      setPermissionDenied(false);
+      window.setTimeout(() => setPermissionDenied(true), 0);
+      return;
+    }
     const ghUsername = extractGithubUsername(profile?.githubUrl);
     if (ghUsername) {
       setShowGithub(true);
     } else {
       openExternal(GITHUB_HOME_URL);
     }
-  }, [profile?.githubUrl]);
+  }, [isAdminAuthenticated, permissions.github, profile?.githubUrl]);
 
   const openProject = useCallback(async (project: SwitchHomeProject) => {
     if (!isRealProject(project)) return;
@@ -309,6 +342,12 @@ export function MobileSwitchAppHome() {
     setAvatarMenuOpen(false);
     playSound("action-click");
 
+    if (!isAdminAuthenticated && !isActionAllowed(actionId, permissions)) {
+      setPermissionDenied(false);
+      window.setTimeout(() => setPermissionDenied(true), 0);
+      return;
+    }
+
     if (actionId === "github-home") {
       openGithubProfile();
       return;
@@ -332,7 +371,7 @@ export function MobileSwitchAppHome() {
     if (actionId === "power") {
       pageRef.current?.scrollTo({ top: 0, behavior: "smooth" });
     }
-  }, [openGithubProfile, playSound]);
+  }, [isAdminAuthenticated, openGithubProfile, permissions, playSound]);
 
   return (
     <section ref={pageRef} className="mobile-switch-app" aria-label="MEO Blog mobile home">
@@ -579,6 +618,11 @@ export function MobileSwitchAppHome() {
       )}
 
       {createPortal(<SaveToast />, document.body)}
+
+      {permissionDenied && createPortal(
+        <span className="switch-permission-toast">权限不足，无法访问</span>,
+        document.body,
+      )}
 
       {detailProject && createPortal(
         <ProjectDetail

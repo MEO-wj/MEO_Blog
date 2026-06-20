@@ -29,6 +29,7 @@ import { useAdminStore } from "../../stores/adminStore";
 import { useSceneStore } from "../../stores/sceneStore";
 import { useSound } from "./useSound";
 import type { Project } from "../../api/types";
+import { DEFAULT_SITE_PERMISSIONS, isActionAllowed } from "./entryPermissions";
 import "./switch-ui.css";
 
 interface SwitchHomeScreenProps {
@@ -141,6 +142,8 @@ export function SwitchHomeScreen({
   const [showGuestbook, setShowGuestbook] = useState(false);
   const [showResume, setShowResume] = useState(false);
   const [showFavorites, setShowFavorites] = useState(false);
+  const [permissions, setPermissions] = useState(DEFAULT_SITE_PERMISSIONS);
+  const [permissionDenied, setPermissionDenied] = useState(false);
   const [clock, setClock] = useState(() => new Date());
 
   const { authenticated: isAdminAuthenticated, setAuthenticated: setAdminAuthenticated, profile, projects: storeProjects, setProjectSummaries, setProfile } = useAdminStore();
@@ -187,7 +190,17 @@ export function SwitchHomeScreen({
     });
     // Profile loads in parallel, not blocking
     api.getPublicProfile().then((p) => { if (!cancelled) setProfile(p); }).catch(() => {});
+    api.getPermissions().then((p) => { if (!cancelled) setPermissions(p); }).catch(() => {});
     return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    function onPermissionsUpdated(event: Event) {
+      const detail = (event as CustomEvent<typeof DEFAULT_SITE_PERMISSIONS>).detail;
+      if (detail) setPermissions(detail);
+    }
+    window.addEventListener("site-permissions-updated", onPermissionsUpdated);
+    return () => window.removeEventListener("site-permissions-updated", onPermissionsUpdated);
   }, []);
 
   const projectItems = useMemo(() => {
@@ -204,7 +217,8 @@ export function SwitchHomeScreen({
   }, [storeProjects]);
 
   const currentProject = projectItems[selectedProject] ?? projectItems[0];
-  const currentAction = switchHomeActions[selectedAction] ?? switchHomeActions[0];
+  const visibleActions = switchHomeActions;
+  const currentAction = visibleActions[selectedAction] ?? visibleActions[0];
   const beijingNow = useMemo(() => {
     const dateText = new Intl.DateTimeFormat("zh-CN", {
       timeZone: "Asia/Shanghai",
@@ -226,6 +240,18 @@ export function SwitchHomeScreen({
     const timer = window.setInterval(() => setClock(new Date()), 1000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (selectedAction >= visibleActions.length) {
+      setSelectedAction(visibleActions.length > 0 ? visibleActions.length - 1 : -1);
+    }
+  }, [selectedAction, visibleActions.length]);
+
+  useEffect(() => {
+    if (!permissionDenied) return;
+    const timer = window.setTimeout(() => setPermissionDenied(false), 1800);
+    return () => window.clearTimeout(timer);
+  }, [permissionDenied]);
 
   useEffect(() => {
     setSelectedProject(0);
@@ -341,8 +367,9 @@ export function SwitchHomeScreen({
             value === 0 ? projectItems.length - 1 : value - 1,
           );
         } else {
+          if (visibleActions.length === 0) return;
           setSelectedAction((value) =>
-            value === 0 ? switchHomeActions.length - 1 : value - 1,
+            value <= 0 ? visibleActions.length - 1 : value - 1,
           );
         }
       }
@@ -352,7 +379,8 @@ export function SwitchHomeScreen({
         if (focusZone === "projects") {
           setSelectedProject((value) => (value + 1) % projectItems.length);
         } else {
-          setSelectedAction((value) => (value + 1) % switchHomeActions.length);
+          if (visibleActions.length === 0) return;
+          setSelectedAction((value) => (value + 1) % visibleActions.length);
         }
       }
 
@@ -370,7 +398,7 @@ export function SwitchHomeScreen({
         event.preventDefault();
         if (focusZone === "projects") {
           goToRoute(currentProject.route);
-        } else {
+        } else if (currentAction) {
           activateAction(currentAction.id);
         }
       }
@@ -383,7 +411,7 @@ export function SwitchHomeScreen({
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [adminPromptOpen, currentAction.id, currentProject, detailProject, focusZone, focused, onRequestExit, playSound, projectItems.length, showBlog, showFavorites, showGithub, showGuestbook, showResume]);
+  }, [adminPromptOpen, currentAction?.id, currentProject, detailProject, focusZone, focused, onRequestExit, playSound, projectItems.length, showBlog, showFavorites, showGithub, showGuestbook, showResume, visibleActions.length]);
 
   function resetAdminGate() {
     adminGateCodeRef.current = "";
@@ -512,6 +540,12 @@ export function SwitchHomeScreen({
       return;
     }
 
+    if (!isAdminAuthenticated && !isActionAllowed(actionId, permissions)) {
+      setPermissionDenied(false);
+      window.setTimeout(() => setPermissionDenied(true), 0);
+      return;
+    }
+
     if (actionId === "power") {
       setSettingsOpen(false);
       setSelectedAction(-1);
@@ -561,7 +595,7 @@ export function SwitchHomeScreen({
     if (routes[actionId]) {
       goToRoute(routes[actionId]);
     }
-  }, [focused, profile?.githubUrl, isAdminAuthenticated, sessionChecking, onRequestFocus, onRequestExit]);
+  }, [focused, permissions, profile?.githubUrl, isAdminAuthenticated, sessionChecking, onRequestFocus, onRequestExit]);
 
   return (
     <section
@@ -582,6 +616,11 @@ export function SwitchHomeScreen({
             style={{ cursor: "pointer" }}
             onClick={() => {
               playSound("action-click");
+              if (!isAdminAuthenticated && !permissions.github) {
+                setPermissionDenied(false);
+                window.setTimeout(() => setPermissionDenied(true), 0);
+                return;
+              }
               const ghUsername = extractGithubUsername(profile?.githubUrl);
               if (ghUsername) {
                 setShowGithub(true);
@@ -674,7 +713,7 @@ export function SwitchHomeScreen({
       </main>
 
       <nav className="switch-action-dock" aria-label="系统操作">
-        {switchHomeActions.map((action, index) => (
+        {visibleActions.map((action, index) => (
           <ActionButton
             key={action.id}
             action={action}
@@ -821,6 +860,11 @@ export function SwitchHomeScreen({
       )}
 
       {createPortal(<SaveToast />, document.body)}
+
+      {permissionDenied && createPortal(
+        <span className="switch-permission-toast">权限不足，无法访问</span>,
+        document.body,
+      )}
 
       {detailProject && createPortal(
         <ProjectDetail project={detailProject} loading={detailLoading} onClose={() => { playSound("close"); setDetailProject(null); setDetailLoading(false); }} />,

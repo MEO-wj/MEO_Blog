@@ -1159,6 +1159,88 @@
   gap: 16px;
 }
 
+.admin-permission-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.admin-permission-list {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-permission-row {
+  min-height: 72px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  border: 1px solid rgba(53, 211, 154, 0.28);
+  border-radius: 6px;
+  padding: 14px 16px;
+  color: #f1f1f3;
+  background: rgba(18, 22, 26, 0.9);
+  text-align: left;
+  cursor: pointer;
+}
+
+.admin-permission-row:hover {
+  border-color: rgba(53, 211, 154, 0.58);
+  background: rgba(53, 211, 154, 0.06);
+}
+
+.admin-permission-row.is-enabled {
+  border-color: rgba(53, 211, 154, 0.62);
+}
+
+.admin-permission-copy {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.admin-permission-copy strong {
+  color: #d9ffe9;
+  font-size: 15px;
+}
+
+.admin-permission-copy span {
+  color: rgba(241, 241, 243, 0.62);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.admin-permission-switch {
+  width: 52px;
+  height: 28px;
+  position: relative;
+  border: 1px solid rgba(169, 171, 184, 0.45);
+  border-radius: 999px;
+  background: rgba(169, 171, 184, 0.16);
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+
+.admin-permission-switch span {
+  width: 22px;
+  height: 22px;
+  position: absolute;
+  top: 2px;
+  left: 3px;
+  border-radius: 50%;
+  background: #a9abb8;
+  transition: transform 0.18s ease, background 0.18s ease;
+}
+
+.admin-permission-row.is-enabled .admin-permission-switch {
+  border-color: #35d39a;
+  background: rgba(53, 211, 154, 0.22);
+}
+
+.admin-permission-row.is-enabled .admin-permission-switch span {
+  transform: translateX(23px);
+  background: #35d39a;
+}
+
 .admin-profile-header {
   display: flex;
   gap: 24px;
@@ -1501,6 +1583,25 @@
 
 .admin-panel-msg-retry:hover {
   filter: brightness(0.9);
+}
+
+.switch-permission-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 34px;
+  z-index: 10000;
+  transform: translateX(-50%);
+  border: 1px solid rgba(233, 69, 96, 0.65);
+  border-radius: 6px;
+  padding: 10px 18px;
+  color: #fff2f4;
+  background: rgba(121, 24, 42, 0.94);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.34);
+  font-size: 14px;
+  font-weight: 760;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: admin-msg-in 0.22s ease;
 }
 
 .admin-profile-form .admin-bio-textarea {

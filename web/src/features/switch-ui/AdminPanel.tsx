@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { api } from "../../api/client";
 import { saveQueue } from "../../api/saveQueue";
-import type { AdminProfile, Partner, Project, ProjectCreate, ProjectSummary, ProjectUpdate } from "../../api/types";
+import type { AdminProfile, Partner, Project, ProjectCreate, ProjectSummary, ProjectUpdate, SitePermissions } from "../../api/types";
 import { useAdminStore } from "../../stores/adminStore";
+import { DEFAULT_SITE_PERMISSIONS } from "./entryPermissions";
 import { useWheelScroll } from "./useWheelScroll";
 
 interface AdminPanelProps {
@@ -15,7 +16,7 @@ const ACCENT_COLORS = [
 ];
 
 export function AdminPanel({ onClose }: AdminPanelProps) {
-  const [tab, setTab] = useState<"profile" | "projects" | "partners">("profile");
+  const [tab, setTab] = useState<"profile" | "projects" | "partners" | "permissions">("profile");
   const { setProfile, setProjectSummaries, setPartners, logout } = useAdminStore();
   const scrollRef = useWheelScroll<HTMLDivElement>();
 
@@ -66,6 +67,12 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
           >
             合作伙伴
           </button>
+          <button
+            className={tab === "permissions" ? "active" : ""}
+            onClick={() => setTab("permissions")}
+          >
+            权限面板
+          </button>
         </div>
         <div ref={scrollRef} className="admin-panel-body">
           {tab === "profile" && (
@@ -77,9 +84,98 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
           {tab === "partners" && (
             <PartnerManager onSave={(p) => setPartners(p)} />
           )}
+          {tab === "permissions" && (
+            <PermissionManager />
+          )}
         </div>
       </div>
     </aside>
+  );
+}
+
+const PERMISSION_ITEMS: Array<{ key: keyof SitePermissions; title: string; description: string }> = [
+  { key: "github", title: "GitHub 入口", description: "允许游客打开 GitHub 资料与贡献信息" },
+  { key: "resume", title: "简历入口", description: "允许游客查看已上传的个人简历" },
+  { key: "guestbook", title: "留言入口", description: "允许游客浏览、发布与回复留言" },
+  { key: "blog", title: "博客入口", description: "允许游客阅读博客文章与评论" },
+  { key: "favorites", title: "收藏栏入口", description: "允许游客查看重要收藏栏" },
+];
+
+function PermissionManager() {
+  const [permissions, setPermissions] = useState<SitePermissions>(DEFAULT_SITE_PERMISSIONS);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [msgType, setMsgType] = useState<"success" | "error">("success");
+
+  useEffect(() => {
+    api.getPermissions()
+      .then((p) => setPermissions(p))
+      .catch(() => {
+        setMsg("权限配置加载失败");
+        setMsgType("error");
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  function showMessage(text: string, type: "success" | "error" = "success") {
+    setMsg(text);
+    setMsgType(type);
+    window.setTimeout(() => setMsg(""), 2200);
+  }
+
+  function togglePermission(key: keyof SitePermissions) {
+    setPermissions((prev) => ({ ...prev, [key]: !prev[key] }));
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      const updated = await api.updatePermissions(permissions);
+      setPermissions(updated);
+      window.dispatchEvent(new CustomEvent("site-permissions-updated", { detail: updated }));
+      showMessage("权限已保存");
+    } catch (error) {
+      showMessage(error instanceof Error ? error.message : "保存失败", "error");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) return <p>加载中...</p>;
+
+  return (
+    <div className="admin-permission-panel">
+      <div className="admin-project-list-header">
+        <strong>游客入口权限</strong>
+        <button type="button" onClick={handleSave} disabled={saving}>
+          {saving ? "保存中..." : "保存权限"}
+        </button>
+      </div>
+      <div className="admin-permission-list">
+        {PERMISSION_ITEMS.map((item) => {
+          const enabled = permissions[item.key];
+          return (
+            <button
+              key={item.key}
+              type="button"
+              className={`admin-permission-row${enabled ? " is-enabled" : ""}`}
+              onClick={() => togglePermission(item.key)}
+              aria-pressed={enabled}
+            >
+              <span className="admin-permission-copy">
+                <strong>{item.title}</strong>
+                <span>{item.description}</span>
+              </span>
+              <span className="admin-permission-switch" aria-hidden="true">
+                <span />
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      {msg && <span className={`admin-panel-msg ${msgType === "error" ? "admin-panel-msg-error" : ""}`}>{msg}</span>}
+    </div>
   );
 }
 

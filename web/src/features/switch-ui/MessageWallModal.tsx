@@ -8,6 +8,50 @@ interface MessageWallModalProps {
   onClose: () => void;
 }
 
+const GUESTBOOK_OWNER_TOKENS_KEY = "guestbook_owner_tokens";
+
+function readOwnerTokens(): Record<string, string> {
+  try {
+    const raw = localStorage.getItem(GUESTBOOK_OWNER_TOKENS_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeOwnerToken(messageId: string, token: string) {
+  if (!messageId || !token) return;
+  try {
+    const tokens = readOwnerTokens();
+    tokens[messageId] = token;
+    localStorage.setItem(GUESTBOOK_OWNER_TOKENS_KEY, JSON.stringify(tokens));
+  } catch {
+    // Ignore private-mode or quota failures; server still owns validation.
+  }
+}
+
+function removeOwnerToken(messageId: string) {
+  try {
+    const tokens = readOwnerTokens();
+    delete tokens[messageId];
+    localStorage.setItem(GUESTBOOK_OWNER_TOKENS_KEY, JSON.stringify(tokens));
+  } catch {
+    // ignore
+  }
+}
+
+function markOwnedMessages(messages: GuestbookMessage[]): GuestbookMessage[] {
+  const tokens = readOwnerTokens();
+  return messages.map((message) => ({
+    ...message,
+    canDelete: message.canDelete || Boolean(tokens[message.id]),
+    replies: (message.replies || []).map((reply) => ({
+      ...reply,
+      canDelete: reply.canDelete || Boolean(tokens[reply.id]),
+    })),
+  }));
+}
+
 function formatTime(iso: string): string {
   const d = new Date(iso);
   const now = new Date();
@@ -57,7 +101,7 @@ export function MessageWallModal({ onClose }: MessageWallModalProps) {
     setLoading(true);
     setError(null);
     api.getGuestbookMessages().then((m) => {
-      setMessages(m);
+      setMessages(markOwnedMessages(m));
       setLoading(false);
     }).catch(() => {
       setLoading(false);
@@ -81,7 +125,8 @@ export function MessageWallModal({ onClose }: MessageWallModalProps) {
         nickname: nickname.trim(),
         content: content.trim(),
       };
-      const msg = await api.createGuestbookMessage(data);
+      const { message: msg, ownerToken } = await api.createGuestbookMessage(data);
+      writeOwnerToken(msg.id, ownerToken);
       msg.canDelete = true;
       setMessages((prev) => [msg, ...prev]);
       setContent("");
@@ -113,10 +158,11 @@ export function MessageWallModal({ onClose }: MessageWallModalProps) {
           )
         );
       } else {
-        const reply = await api.replyToGuestbookAsUser(messageId, {
+        const { message: reply, ownerToken } = await api.replyToGuestbookAsUser(messageId, {
           nickname: currentNickname,
           content: replyContent.trim(),
         });
+        writeOwnerToken(reply.id, ownerToken);
         reply.canDelete = true;
         setMessages((prev) =>
           prev.map((m) =>
@@ -140,7 +186,8 @@ export function MessageWallModal({ onClose }: MessageWallModalProps) {
       if (isAdmin) {
         await api.deleteGuestbookMessage(id);
       } else {
-        await api.deleteOwnGuestbookMessage(id);
+        await api.deleteOwnGuestbookMessage(id, readOwnerTokens()[id]);
+        removeOwnerToken(id);
       }
       setMessages((prev) => prev.filter((m) => m.id !== id));
     } catch {
@@ -153,7 +200,8 @@ export function MessageWallModal({ onClose }: MessageWallModalProps) {
       if (isAdmin) {
         await api.deleteGuestbookReply(replyId);
       } else {
-        await api.deleteOwnGuestbookMessage(replyId);
+        await api.deleteOwnGuestbookMessage(replyId, readOwnerTokens()[replyId]);
+        removeOwnerToken(replyId);
       }
       setMessages((prev) =>
         prev.map((m) =>

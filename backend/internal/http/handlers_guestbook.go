@@ -138,7 +138,8 @@ func userReplyGuestbookHandler(db *pgxpool.Pool, cfg *config.Config) http.Handle
 			return
 		}
 		InvalidateETagCache("guestbook")
-		RespondOK(w, reply)
+		token := guestbookSignToken(cfg.JWTSecret, reply.ID)
+		RespondOK(w, map[string]any{"message": reply, "ownerToken": token})
 	}
 }
 

@@ -24,6 +24,7 @@ func NewRouter(cfg *config.Config, db *pgxpool.Pool, rdb *redis.Client) http.Han
 		r.Post("/admin/login", adminLoginHandler(cfg))
 		r.Get("/admin/session", adminSessionHandler(cfg, rdb))
 		r.Post("/admin/logout", adminLogoutHandler(cfg, rdb))
+		r.With(ETagMiddleware(computePermissionsETag, db, "permissions")).Get("/permissions", publicPermissionsHandler(db))
 
 		r.Get("/projects/summary", publicProjectSummariesHandler(db))
 		r.Get("/project-icons/{id}", projectIconHandler(db))
@@ -31,26 +32,28 @@ func NewRouter(cfg *config.Config, db *pgxpool.Pool, rdb *redis.Client) http.Han
 		r.With(ETagMiddleware(computeProjectDetailETag, db, "project-detail")).Get("/projects/{slug}", getProjectBySlugHandler(db))
 		r.With(ETagMiddleware(computeProfileETag, db, "profile")).Get("/profile", publicProfileHandler(db))
 
-		r.With(ETagMiddleware(computeBlogCategoriesETag, db, "blog-cats")).Get("/blog/categories", listBlogCategoriesHandler(db))
-		r.With(ETagMiddleware(computeBlogPostsETag, db, "blog-posts")).Get("/blog/posts", listBlogPostsHandler(db))
-		r.With(ETagMiddleware(computeBlogPostDetailETag, db, "blog-post-detail")).Get("/blog/posts/{id}", getBlogPostHandler(db))
-		r.Get("/blog/posts/{id}/comments", listBlogCommentsHandler(db))
-		r.With(middleware.RateLimit(2, 10)).Post("/blog/posts/{id}/comments", createBlogCommentHandler(db))
+		r.With(requirePublicPermission(cfg, db, rdb, "blog"), ETagMiddleware(computeBlogCategoriesETag, db, "blog-cats")).Get("/blog/categories", listBlogCategoriesHandler(db))
+		r.With(requirePublicPermission(cfg, db, rdb, "blog"), ETagMiddleware(computeBlogPostsETag, db, "blog-posts")).Get("/blog/posts", listBlogPostsHandler(db))
+		r.With(requirePublicPermission(cfg, db, rdb, "blog"), ETagMiddleware(computeBlogPostDetailETag, db, "blog-post-detail")).Get("/blog/posts/{id}", getBlogPostHandler(db))
+		r.With(requirePublicPermission(cfg, db, rdb, "blog")).Get("/blog/posts/{id}/comments", listBlogCommentsHandler(db))
+		r.With(requirePublicPermission(cfg, db, rdb, "blog"), middleware.RateLimit(2, 10)).Post("/blog/posts/{id}/comments", createBlogCommentHandler(db))
 
-		r.With(ETagMiddleware(computeGuestbookETag, db, "guestbook")).Get("/guestbook/messages", listGuestbookMessagesHandler(db))
-		r.With(middleware.RateLimit(2, 10)).Post("/guestbook/messages", createGuestbookMessageHandler(db, cfg))
-		r.With(middleware.RateLimit(2, 10)).Post("/guestbook/messages/{id}/replies", userReplyGuestbookHandler(db, cfg))
-		r.With(middleware.RateLimit(2, 10)).Delete("/guestbook/messages/{id}", userDeleteGuestbookMessageHandler(db, cfg))
+		r.With(requirePublicPermission(cfg, db, rdb, "guestbook"), ETagMiddleware(computeGuestbookETag, db, "guestbook")).Get("/guestbook/messages", listGuestbookMessagesHandler(db))
+		r.With(requirePublicPermission(cfg, db, rdb, "guestbook"), middleware.RateLimit(2, 10)).Post("/guestbook/messages", createGuestbookMessageHandler(db, cfg))
+		r.With(requirePublicPermission(cfg, db, rdb, "guestbook"), middleware.RateLimit(2, 10)).Post("/guestbook/messages/{id}/replies", userReplyGuestbookHandler(db, cfg))
+		r.With(requirePublicPermission(cfg, db, rdb, "guestbook"), middleware.RateLimit(2, 10)).Delete("/guestbook/messages/{id}", userDeleteGuestbookMessageHandler(db, cfg))
 
-		r.With(ETagMiddleware(computeResumeETag, db, "resume")).Get("/resume", getResumeHandler(db))
-		r.With(ETagMiddleware(computeFavoritesETag, db, "favorites")).Get("/favorites", listFavoritesHandler(db))
+		r.With(requirePublicPermission(cfg, db, rdb, "resume"), ETagMiddleware(computeResumeETag, db, "resume")).Get("/resume", getResumeHandler(db))
+		r.With(requirePublicPermission(cfg, db, rdb, "favorites"), ETagMiddleware(computeFavoritesETag, db, "favorites")).Get("/favorites", listFavoritesHandler(db))
 		r.With(ETagMiddleware(computePartnersETag, db, "partners")).Get("/partners", listPartnersHandler(db))
 
-		r.Get("/github/{username}", githubUserHandler(cfg))
-		r.Get("/github/{username}/contributions", githubContributionsHandler(cfg))
+		r.With(requirePublicPermission(cfg, db, rdb, "github")).Get("/github/{username}", githubUserHandler(cfg))
+		r.With(requirePublicPermission(cfg, db, rdb, "github")).Get("/github/{username}/contributions", githubContributionsHandler(cfg))
 
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.RequireAdmin(cfg, rdb))
+
+			r.Put("/admin/permissions", adminUpdatePermissionsHandler(db))
 
 			r.Get("/admin/profile", getProfileHandler(db))
 			r.Put("/admin/profile", updateProfileHandler(db))

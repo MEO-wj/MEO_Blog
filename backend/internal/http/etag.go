@@ -103,6 +103,18 @@ func computeProfileETag(ctx context.Context, db *pgxpool.Pool) (string, error) {
 	return fmt.Sprintf(`W/"profile-%d"`, ts), nil
 }
 
+func computePermissionsETag(ctx context.Context, db *pgxpool.Pool) (string, error) {
+	var fingerprint string
+	err := db.QueryRow(ctx,
+		`SELECT COALESCE(md5(string_agg(key || ':' || enabled::text || ':' || EXTRACT(EPOCH FROM updated_at)::bigint::text, ',' ORDER BY key)), '')
+		 FROM site_permissions`,
+	).Scan(&fingerprint)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf(`W/"permissions-%s"`, fingerprint), nil
+}
+
 func computeFavoritesETag(ctx context.Context, db *pgxpool.Pool) (string, error) {
 	var count, ts int64
 	var fingerprint string

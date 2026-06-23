@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState, type CSSProperties } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import remarkGfm from "remark-gfm";
 import { api } from "../../api/client";
 import type { BlogCategory, BlogPost } from "../../api/types";
@@ -37,6 +37,9 @@ export function MobileBlogReader({ onClose }: MobileBlogReaderProps) {
   const [readerLoading, setReaderLoading] = useState(false);
   const [error, setError] = useState("");
   const [retrySignal, setRetrySignal] = useState(0);
+  const [descExpanded, setDescExpanded] = useState(false);
+  const [descOverflows, setDescOverflows] = useState(false);
+  const descRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -65,6 +68,25 @@ export function MobileBlogReader({ onClose }: MobileBlogReaderProps) {
       cancelled = true;
     };
   }, [retrySignal]);
+
+  // Detect if category description overflows and reset expand when category changes
+  useEffect(() => {
+    setDescExpanded(false);
+    // Use requestAnimationFrame to wait for DOM paint
+    const raf = requestAnimationFrame(() => {
+      if (descRef.current) {
+        setDescOverflows(descRef.current.scrollWidth > descRef.current.clientWidth);
+      }
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [selectedCategory?.id]);
+
+  const handleDescKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      setDescExpanded((prev) => !prev);
+    }
+  }, []);
 
   const categoryPosts = useMemo(() => {
     if (!selectedCategory) return [];
@@ -219,7 +241,25 @@ export function MobileBlogReader({ onClose }: MobileBlogReaderProps) {
                 </span>
                 <div>
                   <strong>{selectedCategory.name}</strong>
-                  <span>{selectedCategory.description || "文章归档"}</span>
+                  <span
+                    ref={descRef}
+                    className={`mobile-blog-repo-desc${descExpanded ? " expanded" : ""}`}
+                    title={descExpanded ? undefined : (selectedCategory.description || "文章归档")}
+                  >
+                    {selectedCategory.description || "文章归档"}
+                  </span>
+                  {descOverflows && (
+                    <button
+                      type="button"
+                      className="mobile-blog-desc-toggle"
+                      aria-label={descExpanded ? "收起简介" : "展开简介"}
+                      aria-expanded={descExpanded}
+                      onClick={() => setDescExpanded((prev) => !prev)}
+                      onKeyDown={handleDescKeyDown}
+                    >
+                      {descExpanded ? "收起 ▲" : "展开 ▼"}
+                    </button>
+                  )}
                 </div>
               </div>
               {postsLoading ? (

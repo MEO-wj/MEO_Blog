@@ -927,14 +927,46 @@ a.mobile-partner-item:active {
   font-weight: 790;
 }
 
-.mobile-blog-profile-copy > span,
-.mobile-blog-repo-header span {
+.mobile-blog-profile-copy > span {
   overflow: hidden;
   color: #7d8590;
   font-size: 12px;
   font-weight: 650;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.mobile-blog-repo-desc {
+  overflow: hidden;
+  color: #7d8590;
+  font-size: 12px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: white-space 0.2s;
+}
+
+.mobile-blog-repo-desc.expanded {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+}
+
+.mobile-blog-desc-toggle {
+  display: inline-block;
+  margin-top: 2px;
+  padding: 2px 0;
+  background: none;
+  border: none;
+  color: #2f81f7;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.mobile-blog-desc-toggle:active {
+  color: #58a6ff;
 }
 
 .mobile-blog-profile-stats {

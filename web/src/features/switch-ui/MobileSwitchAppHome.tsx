@@ -649,7 +649,11 @@ export function MobileSwitchAppHome() {
       {showGithub && (() => {
         const ghUsername = extractGithubUsername(profile?.githubUrl);
         return ghUsername ? createPortal(
-          <GitHubProfile username={ghUsername} onClose={() => { playSound("close"); setShowGithub(false); }} />,
+          <GitHubProfile
+            username={ghUsername}
+            enableContributionClickPopover
+            onClose={() => { playSound("close"); setShowGithub(false); }}
+          />,
           document.body,
         ) : null;
       })()}

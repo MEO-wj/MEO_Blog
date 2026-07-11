@@ -2029,10 +2029,53 @@
 }
 
 .gh-profile-card {
-  width: 1000px;
-  max-height: 90vh;
+  --gh-profile-radius: 18px;
+  --gh-profile-pad: 40px;
+  --gh-profile-section-pad-y: 30px;
+  --gh-profile-section-pad-x: 40px;
+  --gh-profile-gap: 30px;
+  --gh-profile-header-offset: -36px;
+  --gh-profile-avatar-size: 116px;
+  --gh-profile-close-size: 44px;
+  --gh-profile-close-inset: 20px;
+  --gh-profile-close-font: 24px;
+  --gh-profile-name-font: 34px;
+  --gh-profile-login-font: 24px;
+  --gh-profile-bio-font: 17px;
+  --gh-profile-meta-font: 16px;
+  --gh-profile-button-font: 15px;
+  --gh-profile-button-pad-y: 9px;
+  --gh-profile-button-pad-x: 20px;
+  --gh-profile-title-font: 16px;
+  --gh-profile-section-title-font: 20px;
+  --gh-profile-repo-pad: 20px;
+  --gh-profile-repo-gap: 9px;
+  --gh-profile-repo-name-font: 17px;
+  --gh-profile-repo-desc-font: 14px;
+  --gh-profile-repo-footer-font: 14px;
+  --gh-profile-contrib-cell: 15px;
+  --gh-profile-contrib-gap: 4px;
+  --gh-profile-contrib-radius: 3px;
+  --gh-profile-legend-font: 13px;
+  --gh-profile-popover-font: 14px;
+  --gh-profile-popover-pad-y: 10px;
+  --gh-profile-popover-pad-x: 13px;
+  --gh-profile-popover-min: 116px;
+  --gh-profile-icon-size: 18px;
+  --gh-profile-footer-icon-size: 15px;
+  --gh-profile-dot-size: 12px;
+  --gh-profile-dot-gap: 5px;
+  --gh-profile-loading-min: 360px;
+  --gh-profile-loading-font: 16px;
+  --gh-profile-loading-spinner: 48px;
+  width: clamp(1120px, 62vw, calc(100vw - 80px));
+  height: clamp(680px, 62vh, calc(100vh - 80px));
+  max-width: calc(100vw - 80px);
+  max-height: calc(100vh - 80px);
   position: relative;
-  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--gh-profile-radius);
   background: #0d1117;
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow:
@@ -2061,22 +2104,22 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 300px;
+  min-height: var(--gh-profile-loading-min);
   color: #8b949e;
 }
 
 .gh-loading-spinner {
-  width: 40px;
-  height: 40px;
+  width: var(--gh-profile-loading-spinner);
+  height: var(--gh-profile-loading-spinner);
   border: 3px solid rgba(255, 255, 255, 0.1);
   border-top-color: #58a6ff;
   border-radius: 50%;
   animation: gh-spin 0.8s linear infinite;
-  margin-bottom: 16px;
+  margin-bottom: var(--gh-profile-button-pad-x);
 }
 
 .gh-loading-text {
-  font-size: 14px;
+  font-size: var(--gh-profile-loading-font);
   color: #8b949e;
 }
 
@@ -2085,12 +2128,13 @@
 }
 
 .gh-profile-error button {
-  margin-top: 12px;
-  padding: 6px 20px;
+  margin-top: var(--gh-profile-contrib-cell);
+  padding: var(--gh-profile-button-pad-y) calc(var(--gh-profile-button-pad-x) + 4px);
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 6px;
   color: #c9d1d9;
+  font-size: var(--gh-profile-button-font);
   cursor: pointer;
   transition: background 0.15s;
 }
@@ -2101,24 +2145,24 @@
 
 .gh-profile-error-actions {
   display: flex;
-  gap: 10px;
-  margin-top: 12px;
+  gap: var(--gh-profile-popover-pad-x);
+  margin-top: var(--gh-profile-contrib-cell);
 }
 
 .gh-profile-close {
   position: absolute;
-  top: 16px;
-  right: 16px;
+  top: var(--gh-profile-close-inset);
+  right: var(--gh-profile-close-inset);
   z-index: 2;
-  width: 36px;
-  height: 36px;
+  width: var(--gh-profile-close-size);
+  height: var(--gh-profile-close-size);
   display: grid;
   place-items: center;
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 50%;
   color: #c9d1d9;
-  font-size: 20px;
+  font-size: var(--gh-profile-close-font);
   cursor: pointer;
   transition: background 0.15s;
 }
@@ -2130,36 +2174,36 @@
 /* Header */
 .gh-profile-header {
   display: flex;
-  gap: 24px;
-  padding: 32px;
+  gap: var(--gh-profile-gap);
+  padding: var(--gh-profile-pad);
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   align-items: flex-start;
 }
 
 .gh-profile-header-left {
   display: flex;
-  gap: 24px;
+  gap: var(--gh-profile-gap);
   flex: 1;
   min-width: 0;
 }
 
 .gh-profile-header-right {
   flex: 0 0 auto;
-  padding-top: 8px;
-  margin-left: -80px;
+  padding-top: var(--gh-profile-popover-pad-y);
+  margin-left: var(--gh-profile-header-offset);
 }
 
 .gh-profile-contrib-title {
-  margin: 0 0 8px;
-  font-size: 13px;
+  margin: 0 0 var(--gh-profile-popover-pad-y);
+  font-size: var(--gh-profile-title-font);
   font-weight: 600;
   color: #f0f6fc;
   white-space: nowrap;
 }
 
 .gh-profile-avatar {
-  width: 96px;
-  height: 96px;
+  width: var(--gh-profile-avatar-size);
+  height: var(--gh-profile-avatar-size);
   border-radius: 50%;
   border: 2px solid rgba(255, 255, 255, 0.1);
   flex-shrink: 0;
@@ -2172,7 +2216,7 @@
 
 .gh-profile-name {
   margin: 0;
-  font-size: 26px;
+  font-size: var(--gh-profile-name-font);
   font-weight: 600;
   color: #f0f6fc;
   line-height: 1.2;
@@ -2180,14 +2224,14 @@
 
 .gh-profile-login {
   margin: 2px 0 0;
-  font-size: 20px;
+  font-size: var(--gh-profile-login-font);
   color: #8b949e;
   font-weight: 300;
 }
 
 .gh-profile-bio {
-  margin: 12px 0 0;
-  font-size: 15px;
+  margin: var(--gh-profile-contrib-cell) 0 0;
+  font-size: var(--gh-profile-bio-font);
   color: #c9d1d9;
   line-height: 1.5;
 }
@@ -2195,33 +2239,35 @@
 .gh-profile-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 16px;
-  margin-top: 12px;
+  gap: var(--gh-profile-button-pad-x);
+  margin-top: var(--gh-profile-contrib-cell);
 }
 
 .gh-profile-meta-item {
   display: flex;
   align-items: center;
-  gap: 5px;
-  font-size: 14px;
+  gap: var(--gh-profile-repo-gap);
+  font-size: var(--gh-profile-meta-font);
   color: #8b949e;
 }
 
 .gh-profile-meta-item svg {
+  width: var(--gh-profile-icon-size);
+  height: var(--gh-profile-icon-size);
   flex-shrink: 0;
 }
 
 .gh-profile-link-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  margin-top: 12px;
-  padding: 6px 16px;
+  gap: var(--gh-profile-repo-gap);
+  margin-top: var(--gh-profile-contrib-cell);
+  padding: var(--gh-profile-button-pad-y) var(--gh-profile-button-pad-x);
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 6px;
   color: #58a6ff;
-  font-size: 13px;
+  font-size: var(--gh-profile-button-font);
   text-decoration: none;
   transition: background 0.15s, border-color 0.15s;
 }
@@ -2231,9 +2277,18 @@
   border-color: rgba(255, 255, 255, 0.2);
 }
 
+.gh-profile-link-btn svg {
+  width: var(--gh-profile-icon-size);
+  height: var(--gh-profile-icon-size);
+}
+
 /* Sections */
 .gh-profile-section {
-  padding: 24px 32px;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: var(--gh-profile-section-pad-y) var(--gh-profile-section-pad-x);
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
@@ -2242,18 +2297,20 @@
 }
 
 .gh-profile-section-title {
-  margin: 0 0 16px;
-  font-size: 16px;
+  margin: 0 0 var(--gh-profile-button-pad-x);
+  font-size: var(--gh-profile-section-title-font);
   font-weight: 600;
   color: #f0f6fc;
 }
 
 /* Repos Grid */
 .gh-profile-repos-grid {
+  flex: 1 1 auto;
+  min-height: 0;
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
-  max-height: 220px;
+  gap: var(--gh-profile-contrib-cell);
+  max-height: none;
   overflow-y: auto;
   padding-right: 4px;
 }
@@ -2275,8 +2332,8 @@
 .gh-profile-repo-card {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 16px;
+  gap: var(--gh-profile-repo-gap);
+  padding: var(--gh-profile-repo-pad);
   background: #161b22;
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 8px;
@@ -2293,20 +2350,22 @@
 .gh-profile-repo-name {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 14px;
+  gap: var(--gh-profile-repo-gap);
+  font-size: var(--gh-profile-repo-name-font);
   font-weight: 600;
   color: #58a6ff;
 }
 
 .gh-profile-repo-name svg {
+  width: var(--gh-profile-icon-size);
+  height: var(--gh-profile-icon-size);
   color: #8b949e;
   flex-shrink: 0;
 }
 
 .gh-profile-repo-desc {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--gh-profile-repo-desc-font);
   color: #8b949e;
   line-height: 1.4;
   display: -webkit-box;
@@ -2319,8 +2378,8 @@
 .gh-profile-repo-footer {
   display: flex;
   align-items: center;
-  gap: 12px;
-  font-size: 12px;
+  gap: var(--gh-profile-contrib-cell);
+  font-size: var(--gh-profile-repo-footer-font);
   color: #8b949e;
   margin-top: auto;
 }
@@ -2328,12 +2387,12 @@
 .gh-profile-repo-lang {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--gh-profile-dot-gap);
 }
 
 .gh-profile-lang-dot {
-  width: 10px;
-  height: 10px;
+  width: var(--gh-profile-dot-size);
+  height: var(--gh-profile-dot-size);
   border-radius: 50%;
   background: #8b949e;
 }
@@ -2355,7 +2414,13 @@
 .gh-profile-repo-forks {
   display: flex;
   align-items: center;
-  gap: 3px;
+  gap: var(--gh-profile-contrib-gap);
+}
+
+.gh-profile-repo-stars svg,
+.gh-profile-repo-forks svg {
+  width: var(--gh-profile-footer-icon-size);
+  height: var(--gh-profile-footer-icon-size);
 }
 
 .gh-profile-repo-time {
@@ -2364,8 +2429,8 @@
 
 /* Contributions */
 .gh-profile-contrib {
-  padding-top: 6px;
-  padding-bottom: 4px;
+  padding-top: var(--gh-profile-repo-gap);
+  padding-bottom: var(--gh-profile-dot-gap);
 }
 
 .gh-profile-contrib-grid {
@@ -2373,17 +2438,17 @@
   grid-template-columns: repeat(15, 1fr);
   grid-template-rows: repeat(6, 1fr);
   grid-auto-flow: column;
-  gap: 3px;
+  gap: var(--gh-profile-contrib-gap);
   width: fit-content;
 }
 
 .gh-profile-contrib-cell {
-  width: 12px;
-  height: 12px;
+  width: var(--gh-profile-contrib-cell);
+  height: var(--gh-profile-contrib-cell);
   position: relative;
   display: block;
   border: 0;
-  border-radius: 2px;
+  border-radius: var(--gh-profile-contrib-radius);
   padding: 0;
   outline: 1px solid rgba(255, 255, 255, 0.04);
   color: inherit;
@@ -2412,18 +2477,18 @@
 .gh-profile-contrib-popover {
   position: absolute;
   left: 50%;
-  bottom: calc(100% + 10px);
+  bottom: calc(100% + var(--gh-profile-popover-pad-x));
   z-index: 5;
   display: grid;
-  gap: 2px;
-  min-width: 92px;
-  padding: 8px 10px;
+  gap: var(--gh-profile-contrib-radius);
+  min-width: var(--gh-profile-popover-min);
+  padding: var(--gh-profile-popover-pad-y) var(--gh-profile-popover-pad-x);
   border: 1px solid rgba(139, 148, 158, 0.34);
-  border-radius: 8px;
+  border-radius: var(--gh-profile-popover-pad-y);
   background: #161b22;
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.42);
   color: #f0f6fc;
-  font-size: 12px;
+  font-size: var(--gh-profile-popover-font);
   line-height: 1.25;
   text-align: center;
   pointer-events: none;
@@ -2436,8 +2501,8 @@
   position: absolute;
   left: 50%;
   top: 100%;
-  width: 8px;
-  height: 8px;
+  width: var(--gh-profile-popover-pad-y);
+  height: var(--gh-profile-popover-pad-y);
   border-right: 1px solid rgba(139, 148, 158, 0.34);
   border-bottom: 1px solid rgba(139, 148, 158, 0.34);
   background: #161b22;
@@ -2478,15 +2543,146 @@
 .gh-profile-contrib-legend {
   display: flex;
   align-items: center;
-  gap: 4px;
-  margin-top: 10px;
+  gap: var(--gh-profile-dot-gap);
+  margin-top: var(--gh-profile-popover-pad-x);
   justify-content: flex-end;
-  font-size: 11px;
+  font-size: var(--gh-profile-legend-font);
   color: #8b949e;
 }
 
 .gh-profile-contrib-legend .gh-profile-contrib-cell {
   cursor: default;
+}
+
+@media (min-width: 1280px) {
+  .gh-profile-card {
+    --gh-profile-radius: 20px;
+    --gh-profile-pad: 44px;
+    --gh-profile-section-pad-y: 34px;
+    --gh-profile-section-pad-x: 44px;
+    --gh-profile-gap: 34px;
+    --gh-profile-header-offset: -28px;
+    --gh-profile-avatar-size: 128px;
+    --gh-profile-close-size: 48px;
+    --gh-profile-close-inset: 22px;
+    --gh-profile-close-font: 26px;
+    --gh-profile-name-font: 38px;
+    --gh-profile-login-font: 26px;
+    --gh-profile-bio-font: 18px;
+    --gh-profile-meta-font: 17px;
+    --gh-profile-button-font: 16px;
+    --gh-profile-button-pad-y: 10px;
+    --gh-profile-button-pad-x: 22px;
+    --gh-profile-title-font: 17px;
+    --gh-profile-section-title-font: 22px;
+    --gh-profile-repo-pad: 22px;
+    --gh-profile-repo-gap: 10px;
+    --gh-profile-repo-name-font: 18px;
+    --gh-profile-repo-desc-font: 15px;
+    --gh-profile-repo-footer-font: 15px;
+    --gh-profile-contrib-cell: 17px;
+    --gh-profile-contrib-gap: 5px;
+    --gh-profile-contrib-radius: 4px;
+    --gh-profile-legend-font: 14px;
+    --gh-profile-popover-font: 15px;
+    --gh-profile-popover-pad-y: 11px;
+    --gh-profile-popover-pad-x: 14px;
+    --gh-profile-popover-min: 126px;
+    --gh-profile-icon-size: 19px;
+    --gh-profile-footer-icon-size: 16px;
+    --gh-profile-dot-size: 13px;
+    --gh-profile-dot-gap: 6px;
+    --gh-profile-loading-min: 390px;
+    --gh-profile-loading-font: 17px;
+    --gh-profile-loading-spinner: 52px;
+  }
+}
+
+@media (min-width: 1680px) {
+  .gh-profile-card {
+    --gh-profile-radius: 22px;
+    --gh-profile-pad: 48px;
+    --gh-profile-section-pad-y: 36px;
+    --gh-profile-section-pad-x: 48px;
+    --gh-profile-gap: 36px;
+    --gh-profile-header-offset: -20px;
+    --gh-profile-avatar-size: 144px;
+    --gh-profile-close-size: 52px;
+    --gh-profile-close-inset: 24px;
+    --gh-profile-close-font: 28px;
+    --gh-profile-name-font: 42px;
+    --gh-profile-login-font: 28px;
+    --gh-profile-bio-font: 19px;
+    --gh-profile-meta-font: 18px;
+    --gh-profile-button-font: 17px;
+    --gh-profile-button-pad-y: 11px;
+    --gh-profile-button-pad-x: 24px;
+    --gh-profile-title-font: 18px;
+    --gh-profile-section-title-font: 24px;
+    --gh-profile-repo-pad: 24px;
+    --gh-profile-repo-gap: 11px;
+    --gh-profile-repo-name-font: 19px;
+    --gh-profile-repo-desc-font: 16px;
+    --gh-profile-repo-footer-font: 16px;
+    --gh-profile-contrib-cell: 18px;
+    --gh-profile-contrib-gap: 5px;
+    --gh-profile-contrib-radius: 4px;
+    --gh-profile-legend-font: 14px;
+    --gh-profile-popover-font: 15px;
+    --gh-profile-popover-pad-y: 12px;
+    --gh-profile-popover-pad-x: 15px;
+    --gh-profile-popover-min: 136px;
+    --gh-profile-icon-size: 20px;
+    --gh-profile-footer-icon-size: 17px;
+    --gh-profile-dot-size: 14px;
+    --gh-profile-loading-min: 420px;
+    --gh-profile-loading-font: 18px;
+    --gh-profile-loading-spinner: 56px;
+  }
+}
+
+@media (min-width: 2200px) {
+  .gh-profile-card {
+    --gh-profile-radius: 24px;
+    --gh-profile-pad: 52px;
+    --gh-profile-section-pad-y: 40px;
+    --gh-profile-section-pad-x: 52px;
+    --gh-profile-gap: 40px;
+    --gh-profile-header-offset: -12px;
+    --gh-profile-avatar-size: 160px;
+    --gh-profile-close-size: 56px;
+    --gh-profile-close-inset: 26px;
+    --gh-profile-close-font: 30px;
+    --gh-profile-name-font: 46px;
+    --gh-profile-login-font: 30px;
+    --gh-profile-bio-font: 20px;
+    --gh-profile-meta-font: 19px;
+    --gh-profile-button-font: 18px;
+    --gh-profile-button-pad-y: 12px;
+    --gh-profile-button-pad-x: 26px;
+    --gh-profile-title-font: 19px;
+    --gh-profile-section-title-font: 26px;
+    --gh-profile-repo-pad: 26px;
+    --gh-profile-repo-gap: 12px;
+    --gh-profile-repo-name-font: 20px;
+    --gh-profile-repo-desc-font: 17px;
+    --gh-profile-repo-footer-font: 17px;
+    --gh-profile-contrib-cell: 20px;
+    --gh-profile-contrib-gap: 6px;
+    --gh-profile-contrib-radius: 5px;
+    --gh-profile-legend-font: 15px;
+    --gh-profile-popover-font: 16px;
+    --gh-profile-popover-pad-y: 13px;
+    --gh-profile-popover-pad-x: 16px;
+    --gh-profile-popover-min: 148px;
+    --gh-profile-icon-size: 22px;
+    --gh-profile-footer-icon-size: 18px;
+    --gh-profile-dot-size: 15px;
+    --gh-profile-dot-gap: 7px;
+    --gh-profile-loading-min: 460px;
+    --gh-profile-loading-font: 19px;
+    --gh-profile-loading-spinner: 60px;
+  }
 }
 
 /* ===== Project Detail ===== */
@@ -6523,6 +6719,47 @@
 @media (max-width: 1024px) {
   /* GitHub Profile */
   .gh-profile-card {
+    --gh-profile-radius: 16px;
+    --gh-profile-pad: 24px;
+    --gh-profile-section-pad-y: 20px;
+    --gh-profile-section-pad-x: 24px;
+    --gh-profile-gap: 16px;
+    --gh-profile-header-offset: -40px;
+    --gh-profile-avatar-size: 72px;
+    --gh-profile-close-size: 36px;
+    --gh-profile-close-inset: 16px;
+    --gh-profile-close-font: 20px;
+    --gh-profile-name-font: 22px;
+    --gh-profile-login-font: 17px;
+    --gh-profile-bio-font: 15px;
+    --gh-profile-meta-font: 14px;
+    --gh-profile-button-font: 13px;
+    --gh-profile-button-pad-y: 6px;
+    --gh-profile-button-pad-x: 16px;
+    --gh-profile-title-font: 13px;
+    --gh-profile-section-title-font: 16px;
+    --gh-profile-repo-pad: 16px;
+    --gh-profile-repo-gap: 6px;
+    --gh-profile-repo-name-font: 14px;
+    --gh-profile-repo-desc-font: 12px;
+    --gh-profile-repo-footer-font: 12px;
+    --gh-profile-contrib-cell: 12px;
+    --gh-profile-contrib-gap: 3px;
+    --gh-profile-contrib-radius: 2px;
+    --gh-profile-legend-font: 11px;
+    --gh-profile-popover-font: 12px;
+    --gh-profile-popover-pad-y: 8px;
+    --gh-profile-popover-pad-x: 10px;
+    --gh-profile-popover-min: 92px;
+    --gh-profile-icon-size: 14px;
+    --gh-profile-footer-icon-size: 12px;
+    --gh-profile-dot-size: 10px;
+    --gh-profile-dot-gap: 4px;
+    --gh-profile-loading-min: 300px;
+    --gh-profile-loading-font: 14px;
+    --gh-profile-loading-spinner: 40px;
+    width: 95vw;
+    height: auto;
     max-width: 95vw;
     max-height: 92vh;
   }

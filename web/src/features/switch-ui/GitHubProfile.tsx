@@ -7,6 +7,7 @@ import { useWheelScroll } from "./useWheelScroll";
 interface GitHubProfileProps {
   username: string;
   onClose: () => void;
+  enableContributionClickPopover?: boolean;
 }
 
 interface ContributionDay {
@@ -17,7 +18,11 @@ interface ContributionDay {
 
 const CONTRIBUTION_COLORS = ["#161b22", "#0e4429", "#006d32", "#26a641", "#39d353"];
 
-export function GitHubProfile({ username, onClose }: GitHubProfileProps) {
+export function GitHubProfile({
+  username,
+  onClose,
+  enableContributionClickPopover = false,
+}: GitHubProfileProps) {
   const { profile: adminProfile } = useAdminStore();
   const [user, setUser] = useState<GHUser | null>(null);
   const [repos, setRepos] = useState<GHRepo[]>([]);
@@ -195,7 +200,7 @@ export function GitHubProfile({ username, onClose }: GitHubProfileProps) {
               <div className="gh-profile-contrib">
                 <div className="gh-profile-contrib-grid">
                   {contributions.map((day, i) => {
-                    const selected = selectedContributionIndex === i;
+                    const selected = enableContributionClickPopover && selectedContributionIndex === i;
                     const label = day.date
                       ? `${formatContributionDate(day.date)}：${day.count} 次提交`
                       : "无提交数据";
@@ -213,6 +218,7 @@ export function GitHubProfile({ username, onClose }: GitHubProfileProps) {
                         aria-pressed={selected}
                         disabled={!day.date}
                         onClick={(e) => {
+                          if (!enableContributionClickPopover) return;
                           e.stopPropagation();
                           setSelectedContributionIndex(i);
                         }}

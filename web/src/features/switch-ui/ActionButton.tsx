@@ -32,6 +32,7 @@ export const ActionButton = memo(function ActionButton({
       type="button"
       aria-label={action.label}
       data-action-label={action.label}
+      data-action-id={action.id}
       onMouseEnter={() => {
         if (focused) {
           onSelect();

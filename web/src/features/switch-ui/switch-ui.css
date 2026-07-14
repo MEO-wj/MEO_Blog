@@ -257,7 +257,10 @@
   color: inherit;
   background: transparent;
   opacity: 0.72;
-  transition: none;
+  transform-origin: 50% 58%;
+  transition:
+    opacity 180ms ease,
+    filter 220ms ease;
   cursor: pointer;
 }
 
@@ -293,6 +296,38 @@
   opacity: 1;
 }
 
+@media (hover: hover) and (pointer: fine) {
+  .switch-project-rail:not(.is-dragging) .switch-project-card:hover {
+    animation: switch-project-card-float 2.35s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+    filter: drop-shadow(0 18px 15px rgba(0, 0, 0, 0.3));
+  }
+
+  .switch-project-rail:not(.is-dragging) .switch-project-card:hover .switch-project-cover {
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.12),
+      0 0 24px color-mix(in srgb, var(--project-accent) 26%, transparent);
+  }
+}
+
+@keyframes switch-project-card-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  18% {
+    transform: translateY(-13px) rotate(-0.45deg);
+  }
+  40% {
+    transform: translateY(-8px) rotate(0.32deg);
+  }
+  62% {
+    transform: translateY(-12px) rotate(-0.24deg);
+  }
+  82% {
+    transform: translateY(-7px) rotate(0.16deg);
+  }
+}
+
 .switch-project-card:hover::before,
 .switch-project-card.is-hovered::before {
   opacity: 1;
@@ -310,6 +345,7 @@
   padding: 0;
   background: #29292c;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  transition: box-shadow 220ms ease;
 }
 
 .switch-project-cover::before {
@@ -454,7 +490,10 @@
   color: var(--action-accent);
   background: transparent;
   cursor: pointer;
-  transition: none;
+  transition:
+    color 150ms ease,
+    background-color 150ms ease,
+    box-shadow 180ms ease;
 }
 
 .switch-action-button::before,
@@ -498,6 +537,7 @@
 .switch-action-button:hover {
   color: #fff;
   background: var(--action-accent);
+  box-shadow: 0 7px 18px color-mix(in srgb, var(--action-accent) 30%, transparent);
 }
 
 .switch-action-button.is-hovered::before,
@@ -530,6 +570,88 @@
   z-index: 1;
   stroke-width: 1.8;
   shape-rendering: geometricPrecision;
+  transform-origin: center;
+  transform-box: fill-box;
+}
+
+/* Each dock icon gets one short, characterful gesture per hover. */
+@media (hover: hover) and (pointer: fine) {
+  .switch-action-button[data-action-id="favorites"]:hover svg {
+    animation: switch-action-favorite 640ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .switch-action-button[data-action-id="github-home"]:hover svg {
+    animation: switch-action-github 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .switch-action-button[data-action-id="resume"]:hover svg {
+    animation: switch-action-resume 620ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+
+  .switch-action-button[data-action-id="blog"]:hover svg {
+    animation: switch-action-blog 680ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .switch-action-button[data-action-id="contact"]:hover svg {
+    animation: switch-action-contact 620ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+
+  .switch-action-button[data-action-id="admin"]:hover svg {
+    animation: switch-action-admin 760ms cubic-bezier(0.34, 1.15, 0.64, 1) both;
+  }
+
+  .switch-action-button[data-action-id="power"]:hover svg {
+    animation: switch-action-power 720ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+}
+
+@keyframes switch-action-favorite {
+  0%, 100% { transform: scale(1) rotate(0); }
+  28% { transform: scale(1.24) rotate(-7deg); }
+  52% { transform: scale(0.92) rotate(5deg); }
+  74% { transform: scale(1.1) rotate(-2deg); }
+}
+
+@keyframes switch-action-github {
+  0%, 100% { transform: translateY(0) rotate(0); }
+  26% { transform: translateY(-4px) rotate(-9deg); }
+  52% { transform: translateY(-2px) rotate(8deg); }
+  76% { transform: translateY(-1px) rotate(-3deg); }
+}
+
+@keyframes switch-action-resume {
+  0%, 100% { transform: translateY(0) rotate(0); }
+  34% { transform: translateY(-6px) rotate(-4deg); }
+  62% { transform: translateY(1px) rotate(2deg); }
+  82% { transform: translateY(-2px) rotate(-1deg); }
+}
+
+@keyframes switch-action-blog {
+  0%, 100% { transform: perspective(80px) rotateY(0) scaleX(1); }
+  38% { transform: perspective(80px) rotateY(-24deg) scaleX(0.92); }
+  66% { transform: perspective(80px) rotateY(12deg) scaleX(0.97); }
+  84% { transform: perspective(80px) rotateY(-5deg) scaleX(1); }
+}
+
+@keyframes switch-action-contact {
+  0%, 100% { transform: translateY(0) rotate(0); }
+  32% { transform: translateY(-5px) rotate(6deg); }
+  58% { transform: translateY(1px) rotate(-5deg); }
+  80% { transform: translateY(-1px) rotate(2deg); }
+}
+
+@keyframes switch-action-admin {
+  0% { transform: rotate(0) scale(1); }
+  58% { transform: rotate(205deg) scale(1.1); }
+  82% { transform: rotate(175deg) scale(1.02); }
+  100% { transform: rotate(180deg) scale(1); }
+}
+
+@keyframes switch-action-power {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0 transparent); }
+  32% { transform: scale(1.14); filter: drop-shadow(0 0 5px currentColor); }
+  58% { transform: scale(0.95); filter: drop-shadow(0 0 2px currentColor); }
+  78% { transform: scale(1.06); filter: drop-shadow(0 0 4px currentColor); }
 }
 
 .switch-admin-terminal {
@@ -991,10 +1113,16 @@
 @media (prefers-reduced-motion: reduce) {
   .switch-project-card,
   .switch-project-card::before,
+  .switch-project-cover,
   .switch-action-button,
+  .switch-action-button svg,
   .switch-settings-panel {
     animation: none;
     transition: none;
+  }
+
+  .switch-project-card:hover {
+    filter: none;
   }
 }
 

@@ -1,0 +1,109 @@
+name: CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - dev
+    paths:
+      - "backend/**"
+      - "docker/**"
+      - "docker-compose*.yml"
+      - "model/**"
+      - "web/**"
+      - ".github/workflows/ci.yml"
+      - ".github/workflows/deploy.yml"
+  pull_request:
+    branches:
+      - main
+      - dev
+    paths:
+      - "backend/**"
+      - "docker/**"
+      - "docker-compose*.yml"
+      - "model/**"
+      - "web/**"
+      - ".github/workflows/ci.yml"
+      - ".github/workflows/deploy.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    name: Web Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check and build
+        run: npm run build
+
+  backend:
+    name: Backend Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: Download modules
+        run: go mod download
+
+      - name: Run tests
+        run: go test ./...
+
+      - name: Run static analysis
+        run: go vet ./...
+
+  compose:
+    name: Production Images
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs:
+      - web
+      - backend
+    env:
+      POSTGRES_PASSWORD: ci-only-password
+      POSTGRES_PASSWORD_URL: ci-only-password
+      JWT_SECRET: ci-only-jwt-secret
+      ADMIN_PASSWORD: ci-only-admin-password
+      ADMIN_SEQUENCE: ci-only-admin-sequence
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Validate server compose file
+        run: docker compose -f docker-compose.server.yml config --quiet
+
+      - name: Build production images
+        run: docker compose -f docker-compose.server.yml build nginx backend

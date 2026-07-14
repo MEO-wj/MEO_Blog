@@ -1,0 +1,119 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: Full main-branch commit SHA that has already passed CI
+        required: true
+        type: string
+  workflow_run:
+    workflows:
+      - CI
+    branches:
+      - main
+    types:
+      - completed
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy Production
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: >-
+      ${{ github.event_name == 'workflow_dispatch' ||
+          (github.event.workflow_run.conclusion == 'success' &&
+           github.event.workflow_run.event == 'push' &&
+           github.event.workflow_run.head_branch == 'main') }}
+    environment:
+      name: production
+      url: https://meowj.top
+    env:
+      DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+      DEPLOY_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.commit_sha }}
+    steps:
+      - name: Validate deployment target
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$DEPLOY_PATH"
+          test -n "$DEPLOY_SHA"
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT || 22 }}
+          fingerprint: ${{ secrets.DEPLOY_FINGERPRINT }}
+          command_timeout: 30m
+          envs: DEPLOY_PATH,DEPLOY_SHA
+          script: |
+            set -eu
+            umask 077
+
+            command -v docker >/dev/null
+            command -v git >/dev/null
+            command -v flock >/dev/null
+
+            cd "$DEPLOY_PATH"
+            test -f .env
+
+            for key in POSTGRES_PASSWORD POSTGRES_PASSWORD_URL JWT_SECRET ADMIN_PASSWORD ADMIN_SEQUENCE; do
+              if ! grep -Eq "^${key}=.+" .env; then
+                echo "Missing required server environment variable: ${key}" >&2
+                exit 1
+              fi
+            done
+
+            exec 9>"$DEPLOY_PATH/.deploy.lock"
+            if ! flock -n 9; then
+              echo "Another production deployment is already running" >&2
+              exit 1
+            fi
+
+            git fetch origin main --prune
+            git cat-file -e "${DEPLOY_SHA}^{commit}"
+            git merge-base --is-ancestor "$DEPLOY_SHA" origin/main
+
+            if ! git diff --quiet || ! git diff --cached --quiet; then
+              echo "Deployment worktree has tracked changes; refusing to overwrite them" >&2
+              exit 1
+            fi
+
+            git checkout --detach "$DEPLOY_SHA"
+
+            mkdir -p data/backups
+            if docker compose -f docker-compose.server.yml ps --status running --services | grep -qx postgres; then
+              backup_path="data/backups/pre-deploy-$(date -u +%Y%m%dT%H%M%SZ)-${DEPLOY_SHA}.dump"
+              docker compose -f docker-compose.server.yml exec -T postgres \
+                pg_dump -U meo -d meo_blog -Fc > "${backup_path}.tmp"
+              mv "${backup_path}.tmp" "$backup_path"
+            fi
+
+            docker compose -f docker-compose.server.yml up -d --build --remove-orphans
+            docker compose -f docker-compose.server.yml ps
+            docker compose -f docker-compose.server.yml exec -T nginx wget -qO- http://127.0.0.1/healthz >/dev/null
+            docker compose -f docker-compose.server.yml exec -T backend wget -qO- http://127.0.0.1:8080/api/v1/health >/dev/null
+
+      - name: Verify public endpoint
+        shell: bash
+        run: |
+          curl --fail --silent --show-error \
+            --retry 6 --retry-delay 5 --retry-all-errors \
+            https://meowj.top/api/v1/health >/dev/null
+
+      - name: Deploy summary
+        run: |
+          echo "## Production deploy complete" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Trigger: \`${{ github.event_name }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Commit: \`$DEPLOY_SHA\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Environment: [production](https://meowj.top)" >> "$GITHUB_STEP_SUMMARY"

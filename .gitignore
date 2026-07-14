@@ -17,6 +17,8 @@ web/dist/
 
 # Docker
 .env
+/.deploy.lock
+/data/
 
 # Temp scripts
 *.ps1

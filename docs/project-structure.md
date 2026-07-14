@@ -25,7 +25,7 @@ MEO_Blog/
 backend/
 ├── go.mod                              # Go 模块定义
 ├── go.sum                              # 依赖校验
-├── Dockerfile                          # 多阶段构建：golang:1.22-alpine → alpine:3.19
+├── Dockerfile                          # 多阶段构建：golang:1.26.5-alpine → alpine:3.24.1
 ├── cmd/
 │   └── server/
 │       └── main.go                     # 程序入口：加载配置、启动 HTTP 服务、优雅关闭
@@ -114,7 +114,7 @@ web/
 ├── vite-env.d.ts                       # Vite 类型声明
 ├── vite.config.ts                      # Vite 配置：React 插件、Tailwind、模型文件代理中间件
 ├── index.html                          # HTML 入口
-├── Dockerfile                          # 多阶段构建：node:20-alpine → nginx:alpine
+├── Dockerfile                          # 多阶段构建：node:24-alpine → nginx:alpine
 ├── public/
 │   └── Sence_layout.json               # 3D 场景布局数据（由 3D_Layout_Editor 生成）
 └── src/

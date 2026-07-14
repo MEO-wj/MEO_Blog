@@ -88,7 +88,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest     # GitHub 提供的免费虚拟机
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - run: echo "代码已拉取，开始部署！"
 ```
 
@@ -106,7 +106,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
@@ -160,7 +160,7 @@ jobs:
 
 ```dockerfile
 # 阶段 1：编译（有 node、npm、源码）
-FROM node:20-alpine AS builder
+FROM node:24-alpine AS builder
 WORKDIR /app
 COPY . .
 RUN npm ci && npm run build
@@ -171,6 +171,48 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 ```
 
 最终镜像只有 ~20MB，而不是 ~800MB。
+
+---
+
+## 本项目的生产部署配置
+
+仓库中的实际工作流分为两段：
+
+- `.github/workflows/ci.yml`：前端构建、Go 测试与静态检查、Compose 校验、生产镜像构建。
+- `.github/workflows/deploy.yml`：仅在 `main` 的 CI 成功后部署该次通过验证的精确提交。
+
+### GitHub production Environment
+
+在仓库的 `Settings → Environments` 创建 `production`，并限制只有 `main` 可以部署。建议开启 required reviewer。
+
+Environment secrets：
+
+| 名称 | 用途 |
+|---|---|
+| `DEPLOY_HOST` | 服务器地址 |
+| `DEPLOY_USER` | SSH 用户 |
+| `DEPLOY_SSH_KEY` | SSH 私钥 |
+| `DEPLOY_PORT` | SSH 端口，可选，默认 22 |
+| `DEPLOY_FINGERPRINT` | 服务器 SSH 主机指纹，防止中间人攻击 |
+
+Environment variable：
+
+| 名称 | 示例 |
+|---|---|
+| `DEPLOY_PATH` | `/home/ubuntu/Web_and_APP/Blog` |
+
+### 服务器准备
+
+1. 安装 Git、Docker Engine、Docker Compose 插件和 `flock`。
+2. 将仓库克隆到 `DEPLOY_PATH`，确保部署用户可运行 Docker。
+3. 复制 `.env.example` 为 `.env`，填写所有生产密码；不要提交 `.env`。
+4. 创建 `data/uploads`、`data/postgres`、`data/redis` 和 `data/backups`，并赋予正确权限。
+5. 配置 DNS、80/443 防火墙规则和 `/etc/letsencrypt/live/meowj.top/` 证书。
+6. 不要向公网开放 PostgreSQL 5432 或 Redis 6379。
+
+部署前会在 `data/backups` 生成 PostgreSQL 自定义格式备份。备份不会自动删除，需要按服务器磁盘容量配置独立的保留策略和异地备份。
+
+手动运行 Deploy 工作流时，必须填写一个已经通过 CI、且属于远端 `main` 的完整 commit SHA；这避免手动发布绕过验证。
 
 ---
 

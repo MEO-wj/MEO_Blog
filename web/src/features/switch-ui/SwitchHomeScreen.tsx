@@ -232,8 +232,15 @@ export function SwitchHomeScreen({
       minute: "2-digit",
       hour12: false,
     }).format(clock);
+    const [hourText = "", minuteText = ""] = timeText.split(":");
 
-    return { dateText, timeText };
+    return {
+      dateText,
+      timeText,
+      hourText,
+      minuteText,
+      tick: Math.floor(clock.getTime() / 1000),
+    };
   }, [clock]);
 
   useEffect(() => {
@@ -650,7 +657,25 @@ export function SwitchHomeScreen({
 
         <div className="switch-status" aria-label="Beijing date and time">
           <span>{beijingNow.dateText}</span>
-          <strong>{beijingNow.timeText}</strong>
+          <strong className="switch-clock" aria-label={beijingNow.timeText}>
+            <span
+              key={`hour-${beijingNow.tick}`}
+              className="switch-clock-number"
+              aria-hidden="true"
+            >
+              {beijingNow.hourText}
+            </span>
+            <span className="switch-clock-separator" aria-hidden="true">
+              :
+            </span>
+            <span
+              key={`minute-${beijingNow.tick}`}
+              className="switch-clock-number is-minute"
+              aria-hidden="true"
+            >
+              {beijingNow.minuteText}
+            </span>
+          </strong>
         </div>
       </header>
 

@@ -68,10 +68,31 @@
 }
 
 .switch-profile {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 16px;
   min-width: 0;
+  isolation: isolate;
+  transform-origin: left center;
+  transition: transform 320ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.switch-profile::before {
+  content: "";
+  position: absolute;
+  inset: -10px -16px;
+  z-index: -1;
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at 20% 50%, rgba(72, 219, 251, 0.14), transparent 48%),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.055), transparent 78%);
+  opacity: 0;
+  transform: scale(0.94) translateX(-6px);
+  transition:
+    opacity 260ms ease,
+    transform 360ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  pointer-events: none;
 }
 
 .switch-avatar {
@@ -87,6 +108,11 @@
   background:
     radial-gradient(circle at 32% 26%, rgba(255, 255, 255, 0.85), transparent 12%),
     linear-gradient(135deg, #2dc8ff 0%, #6c72ff 50%, #ff5c88 100%);
+  transform-origin: 50% 72%;
+  transition:
+    transform 360ms cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 260ms ease,
+    box-shadow 320ms ease;
 }
 
 .switch-avatar::after {
@@ -97,12 +123,23 @@
   font-size: 32px;
   font-weight: 780;
   line-height: 1;
+  transition: transform 320ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.switch-avatar img {
+  transition:
+    transform 420ms cubic-bezier(0.16, 1, 0.3, 1),
+    filter 280ms ease;
 }
 
 .switch-profile-row {
   display: flex;
   align-items: center;
   gap: 8px;
+  transition:
+    transform 300ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    color 240ms ease,
+    opacity 240ms ease;
 }
 
 .switch-profile-icon {
@@ -112,12 +149,39 @@
   fill: none;
   vertical-align: middle;
   transform: translateY(3px);
+  transition:
+    transform 320ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 240ms ease,
+    filter 240ms ease;
 }
 
 .switch-profile-info strong {
+  width: max-content;
+  position: relative;
   font-size: 28px;
   font-weight: 760;
   line-height: 1;
+  transition:
+    transform 300ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    color 240ms ease,
+    text-shadow 240ms ease;
+}
+
+.switch-profile-info strong::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -5px;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--ns-cyan), rgba(108, 114, 255, 0.3));
+  opacity: 0;
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition:
+    opacity 220ms ease,
+    transform 360ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .switch-profile-info span {
@@ -156,9 +220,140 @@
 }
 
 .switch-status > span {
+  position: relative;
+  display: inline-block;
+  isolation: isolate;
+  margin: -5px -8px;
+  padding: 5px 8px;
+  border-radius: 10px;
   color: rgba(241, 241, 243, 0.66);
   font-size: 20px;
   font-weight: 720;
+  animation: switch-date-float 4.2s ease-in-out infinite;
+  transform-origin: 50% 70%;
+  transition:
+    color 260ms ease,
+    background 260ms ease,
+    text-shadow 260ms ease;
+  will-change: transform;
+}
+
+.switch-status > span::after {
+  content: "";
+  position: absolute;
+  left: 16%;
+  right: 16%;
+  bottom: 0;
+  height: 6px;
+  z-index: -1;
+  border-radius: 50%;
+  background: rgba(72, 219, 251, 0.28);
+  filter: blur(8px);
+  opacity: 0.16;
+  animation: switch-date-shadow 4.2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .switch-profile:hover,
+  .switch-profile:focus-within {
+    transform: translateY(-3px);
+  }
+
+  .switch-profile:hover::before,
+  .switch-profile:focus-within::before {
+    opacity: 1;
+    transform: scale(1) translateX(0);
+  }
+
+  .switch-profile:hover .switch-avatar,
+  .switch-profile:focus-within .switch-avatar {
+    border-color: rgba(102, 225, 255, 0.82);
+    box-shadow:
+      0 12px 24px rgba(0, 0, 0, 0.3),
+      0 0 0 4px rgba(72, 219, 251, 0.08),
+      0 0 24px rgba(72, 219, 251, 0.26);
+    transform: translateY(-2px) rotate(-1deg) scale(1.045);
+  }
+
+  .switch-profile:hover .switch-avatar img,
+  .switch-profile:focus-within .switch-avatar img {
+    filter: saturate(1.08) brightness(1.05);
+    transform: scale(1.06) rotate(1deg);
+  }
+
+  .switch-profile:hover .switch-avatar span,
+  .switch-profile:focus-within .switch-avatar span {
+    transform: scale(1.08) rotate(2deg);
+  }
+
+  .switch-profile:hover .switch-profile-info strong,
+  .switch-profile:focus-within .switch-profile-info strong {
+    color: #fff;
+    text-shadow: 0 0 14px rgba(72, 219, 251, 0.24);
+    transform: translateX(4px);
+  }
+
+  .switch-profile:hover .switch-profile-info strong::after,
+  .switch-profile:focus-within .switch-profile-info strong::after {
+    opacity: 0.75;
+    transform: scaleX(1);
+  }
+
+  .switch-profile:hover .switch-profile-row,
+  .switch-profile:focus-within .switch-profile-row {
+    color: rgba(241, 241, 243, 0.86);
+    opacity: 1;
+    transform: translateX(6px);
+    transition-delay: 45ms;
+  }
+
+  .switch-profile:hover .switch-profile-icon,
+  .switch-profile:focus-within .switch-profile-icon {
+    opacity: 0.95;
+    filter: drop-shadow(0 0 6px rgba(72, 219, 251, 0.5));
+    transform: translateY(3px) rotate(-7deg) scale(1.08);
+  }
+
+  .switch-avatar:active {
+    transform: translateY(0) rotate(0) scale(0.96);
+    transition-duration: 100ms;
+  }
+
+  .switch-status > span:hover {
+    color: rgba(255, 255, 255, 0.94);
+    background: rgba(255, 255, 255, 0.045);
+    text-shadow: 0 0 12px rgba(72, 219, 251, 0.3);
+  }
+}
+
+@keyframes switch-date-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  42% {
+    transform: translateY(-4px) rotate(0.18deg);
+  }
+  68% {
+    transform: translateY(-2px) rotate(-0.12deg);
+  }
+}
+
+@keyframes switch-date-shadow {
+  0%,
+  100% {
+    opacity: 0.12;
+    transform: scaleX(0.86);
+  }
+  42% {
+    opacity: 0.28;
+    transform: scaleX(1.08);
+  }
+  68% {
+    opacity: 0.2;
+    transform: scaleX(0.96);
+  }
 }
 
 .switch-clock {
@@ -1179,6 +1374,17 @@
   .switch-project-cover,
   .switch-action-button,
   .switch-action-button svg,
+  .switch-profile,
+  .switch-profile::before,
+  .switch-avatar,
+  .switch-avatar img,
+  .switch-avatar span,
+  .switch-profile-row,
+  .switch-profile-icon,
+  .switch-profile-info strong,
+  .switch-profile-info strong::after,
+  .switch-status > span,
+  .switch-status > span::after,
   .switch-clock-number,
   .switch-clock-separator,
   .switch-settings-panel {
@@ -1189,6 +1395,27 @@
   .switch-clock-separator {
     opacity: 1;
     text-shadow: none;
+  }
+
+  .switch-profile:hover,
+  .switch-profile:focus-within,
+  .switch-profile:hover .switch-avatar,
+  .switch-profile:focus-within .switch-avatar,
+  .switch-profile:hover .switch-avatar img,
+  .switch-profile:focus-within .switch-avatar img,
+  .switch-profile:hover .switch-avatar span,
+  .switch-profile:focus-within .switch-avatar span,
+  .switch-profile:hover .switch-profile-info strong,
+  .switch-profile:focus-within .switch-profile-info strong,
+  .switch-profile:hover .switch-profile-row,
+  .switch-profile:focus-within .switch-profile-row,
+  .switch-status > span {
+    transform: none;
+  }
+
+  .switch-profile:hover .switch-profile-icon,
+  .switch-profile:focus-within .switch-profile-icon {
+    transform: translateY(3px);
   }
 
   .switch-project-card:hover {

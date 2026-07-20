@@ -217,7 +217,7 @@
   line-height: 1;
 }
 
-.switch-status > span {
+.switch-date {
   position: relative;
   display: inline-block;
   isolation: isolate;
@@ -227,16 +227,13 @@
   color: rgba(241, 241, 243, 0.66);
   font-size: 20px;
   font-weight: 720;
-  animation: switch-date-float 4.2s ease-in-out infinite;
-  transform-origin: 50% 70%;
   transition:
     color 260ms ease,
     background 260ms ease,
     text-shadow 260ms ease;
-  will-change: transform;
 }
 
-.switch-status > span::after {
+.switch-date::after {
   content: "";
   position: absolute;
   left: 16%;
@@ -247,9 +244,19 @@
   border-radius: 50%;
   background: rgba(72, 219, 251, 0.28);
   filter: blur(8px);
-  opacity: 0.16;
-  animation: switch-date-shadow 4.2s ease-in-out infinite;
+  opacity: 0.14;
   pointer-events: none;
+}
+
+.switch-date-digit,
+.switch-date-separator {
+  display: inline-block;
+}
+
+.switch-date-digit {
+  transform-origin: 50% 72%;
+  animation: switch-date-digit-float 4s ease-in-out infinite;
+  will-change: transform;
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -318,7 +325,7 @@
     transition-duration: 100ms;
   }
 
-  .switch-status > span:hover {
+  .switch-date:hover {
     color: rgba(255, 255, 255, 0.94);
     background: rgba(255, 255, 255, 0.045);
     text-shadow: 0 0 12px rgba(72, 219, 251, 0.3);
@@ -341,32 +348,13 @@
   }
 }
 
-@keyframes switch-date-float {
+@keyframes switch-date-digit-float {
   0%,
   100% {
     transform: translateY(0) rotate(0deg);
   }
-  42% {
-    transform: translateY(-4px) rotate(0.18deg);
-  }
-  68% {
-    transform: translateY(-2px) rotate(-0.12deg);
-  }
-}
-
-@keyframes switch-date-shadow {
-  0%,
-  100% {
-    opacity: 0.12;
-    transform: scaleX(0.86);
-  }
-  42% {
-    opacity: 0.28;
-    transform: scaleX(1.08);
-  }
-  68% {
-    opacity: 0.2;
-    transform: scaleX(0.96);
+  50% {
+    transform: translateY(var(--switch-date-lift, -3px)) rotate(var(--switch-date-tilt, 0deg));
   }
 }
 
@@ -1397,8 +1385,9 @@
   .switch-profile-icon,
   .switch-profile-info strong,
   .switch-profile-info strong::after,
-  .switch-status > span,
-  .switch-status > span::after,
+  .switch-date,
+  .switch-date::after,
+  .switch-date-digit,
   .switch-clock-number,
   .switch-clock-separator,
   .switch-settings-panel {
@@ -1423,7 +1412,8 @@
   .switch-profile:focus-within .switch-profile-info strong,
   .switch-profile:hover .switch-profile-row,
   .switch-profile:focus-within .switch-profile-row,
-  .switch-status > span {
+  .switch-date,
+  .switch-date-digit {
     transform: none;
   }
 

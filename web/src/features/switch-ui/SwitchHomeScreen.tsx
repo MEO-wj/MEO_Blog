@@ -656,7 +656,29 @@ export function SwitchHomeScreen({
         </div>
 
         <div className="switch-status" aria-label="Beijing date and time">
-          <span>{beijingNow.dateText}</span>
+          <span className="switch-date" aria-label={beijingNow.dateText}>
+            {Array.from(beijingNow.dateText).map((character, index) =>
+              /\d/.test(character) ? (
+                <span
+                  key={`${character}-${index}`}
+                  className="switch-date-digit"
+                  aria-hidden="true"
+                  style={{
+                    "--switch-date-lift": `${-(2.4 + (index % 3) * 0.7)}px`,
+                    "--switch-date-tilt": `${((index % 4) - 1.5) * 0.12}deg`,
+                    animationDelay: `${-(index * 0.43)}s`,
+                    animationDuration: `${3.5 + (index % 4) * 0.36}s`,
+                  } as CSSProperties}
+                >
+                  {character}
+                </span>
+              ) : (
+                <span key={`${character}-${index}`} className="switch-date-separator" aria-hidden="true">
+                  {character}
+                </span>
+              ),
+            )}
+          </span>
           <strong className="switch-clock" aria-label={beijingNow.timeText}>
             <span
               key={`hour-${beijingNow.tick}`}

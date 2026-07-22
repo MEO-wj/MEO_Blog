@@ -3,6 +3,7 @@ package http
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -135,6 +136,10 @@ func createProjectHandler(db *pgxpool.Pool) http.HandlerFunc {
 		}
 		project, err := repository.CreateProject(r.Context(), db, &c)
 		if err != nil {
+			if errors.Is(err, repository.ErrProjectLimitReached) {
+				RespondError(w, "PROJECT_LIMIT_REACHED", "project limit reached (max 100)", http.StatusConflict)
+				return
+			}
 			RespondError(w, "CREATE_FAILED", "failed to create project", http.StatusInternalServerError)
 			return
 		}

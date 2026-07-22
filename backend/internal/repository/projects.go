@@ -2,12 +2,19 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+const MaxProjectCount = 100
+
+var ErrProjectLimitReached = errors.New("project limit reached")
+
+const projectCreateLockID int64 = 0x4d454f50524f4a
 
 type Project struct {
 	ID          string   `json:"id"`
@@ -166,12 +173,40 @@ func CreateProject(ctx context.Context, db *pgxpool.Pool, c *ProjectCreate) (*Pr
 	if tech == nil {
 		tech = []string{}
 	}
-	return scanProject(db.QueryRow(ctx,
+
+	tx, err := db.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	// Serialize project creation so concurrent requests cannot both pass the
+	// maximum-count check.
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock($1)`, projectCreateLockID); err != nil {
+		return nil, err
+	}
+
+	var count int
+	if err := tx.QueryRow(ctx, `SELECT count(*) FROM projects`).Scan(&count); err != nil {
+		return nil, err
+	}
+	if count >= MaxProjectCount {
+		return nil, ErrProjectLimitReached
+	}
+
+	project, err := scanProject(tx.QueryRow(ctx,
 		`INSERT INTO projects (name, slug, description, repo_url, icon_url, accent_color, category, status, tech_stack, sort_order)
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, (SELECT COALESCE(MAX(sort_order), -1) + 1 FROM projects))
 		 RETURNING `+projectSelectCols,
 		c.Name, c.Slug, c.Description, c.RepoURL, c.IconURL, c.AccentColor, c.Category, c.Status, tech,
 	))
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	return project, nil
 }
 
 func UpdateProject(ctx context.Context, db *pgxpool.Pool, id string, u *ProjectUpdate) (*Project, error) {

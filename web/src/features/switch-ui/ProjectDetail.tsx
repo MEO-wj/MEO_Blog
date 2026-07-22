@@ -65,7 +65,7 @@ export function ProjectDetail({ project, loading, onClose }: ProjectDetailProps)
           )}
         </div>
 
-        <div ref={scrollRef} className="project-detail-right">
+        <div className="project-detail-right">
           <div className="project-detail-header">
             <h2 className="project-detail-title">{name}</h2>
             {category && <span className="project-detail-category">{category}</span>}
@@ -87,67 +87,72 @@ export function ProjectDetail({ project, loading, onClose }: ProjectDetailProps)
             </div>
           )}
 
-          {loading ? (
-            <>
+          {(loading || description) && (
+            <section className="project-detail-summary">
               <h3 className="project-detail-subtitle">项目简介</h3>
               <hr className="project-detail-divider" />
-              <div className="project-detail-loading">
-                <div className="project-detail-skeleton" />
-                <div className="project-detail-skeleton short" />
-                <div className="project-detail-skeleton" />
+              <div ref={scrollRef} className="project-detail-summary-scroll">
+                {loading ? (
+                  <div className="project-detail-loading">
+                    <div className="project-detail-skeleton" />
+                    <div className="project-detail-skeleton short" />
+                    <div className="project-detail-skeleton" />
+                  </div>
+                ) : (
+                  <div className="project-detail-desc blog-markdown">
+                    <Suspense fallback={<div style={{color:"#8a9bbd",padding:20}}>加载中...</div>}>
+                      <Markdown remarkPlugins={[remarkGfm]}>{description}</Markdown>
+                    </Suspense>
+                  </div>
+                )}
               </div>
-            </>
-          ) : description ? (
-            <>
-              <h3 className="project-detail-subtitle">项目简介</h3>
-              <hr className="project-detail-divider" />
-              <div className="project-detail-desc blog-markdown">
-                <Suspense fallback={<div style={{color:"#8a9bbd",padding:20}}>加载中...</div>}>
-                  <Markdown remarkPlugins={[remarkGfm]}>{description}</Markdown>
-                </Suspense>
-              </div>
-            </>
-          ) : null}
+            </section>
+          )}
 
-          <div className="project-detail-actions">
-            {repoUrl && (
-              <a
-                className="project-detail-btn"
-                href={repoUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <svg viewBox="0 0 32 32" width="16" height="16" aria-hidden="true">
-                  <path d="M10.5 25.5c-3.5 1.2-3.5-1.5-5-2.5" />
-                  <path d="M21.5 29v-4.5c0-1.2.3-2-.6-2.8 3-.4 6.1-1.5 6.1-6.5 0-1.5-.5-2.8-1.4-3.8.1-.4.6-1.9-.1-3.8 0 0-1.2-.4-4 1.4a14 14 0 0 0-7.2 0c-2.8-1.8-4-1.4-4-1.4-.7 1.9-.2 3.4-.1 3.8-.9 1-1.4 2.3-1.4 3.8 0 5 3.1 6.1 6.1 6.5-.5.4-.8 1.1-.9 2.1V29" />
-                </svg>
-                GitHub 仓库
-              </a>
-            )}
-            {demoUrl && (
-              <a
-                className="project-detail-btn"
-                href={demoUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                  <polyline points="15 3 21 3 21 9" />
-                  <line x1="10" y1="14" x2="21" y2="3" />
-                </svg>
-                在线预览
-              </a>
-            )}
-          </div>
+          {(repoUrl || demoUrl || status) && (
+            <footer className="project-detail-footer">
+              {(repoUrl || demoUrl) && (
+                <div className="project-detail-actions">
+                  {repoUrl && (
+                    <a
+                      className="project-detail-btn"
+                      href={repoUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <svg viewBox="0 0 32 32" width="16" height="16" aria-hidden="true">
+                        <path d="M10.5 25.5c-3.5 1.2-3.5-1.5-5-2.5" />
+                        <path d="M21.5 29v-4.5c0-1.2.3-2-.6-2.8 3-.4 6.1-1.5 6.1-6.5 0-1.5-.5-2.8-1.4-3.8.1-.4.6-1.9-.1-3.8 0 0-1.2-.4-4 1.4a14 14 0 0 0-7.2 0c-2.8-1.8-4-1.4-4-1.4-.7 1.9-.2 3.4-.1 3.8-.9 1-1.4 2.3-1.4 3.8 0 5 3.1 6.1 6.1 6.5-.5.4-.8 1.1-.9 2.1V29" />
+                      </svg>
+                      GitHub 仓库
+                    </a>
+                  )}
+                  {demoUrl && (
+                    <a
+                      className="project-detail-btn"
+                      href={demoUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                        <polyline points="15 3 21 3 21 9" />
+                        <line x1="10" y1="14" x2="21" y2="3" />
+                      </svg>
+                      在线预览
+                    </a>
+                  )}
+                </div>
+              )}
+              {status && (
+                <div className="project-detail-status">
+                  <span className="project-detail-status-dot" />
+                  <span>{STATUS_LABELS[status] || status}</span>
+                </div>
+              )}
+            </footer>
+          )}
         </div>
-
-        {status && (
-          <div className="project-detail-status">
-            <span className="project-detail-status-dot" />
-            <span>{STATUS_LABELS[status] || status}</span>
-          </div>
-        )}
       </div>
     </div>
   );

@@ -3690,8 +3690,8 @@
   flex-direction: column;
   gap: clamp(16px, 1.15vw, 26px);
   min-width: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .project-detail-header {
@@ -3726,6 +3726,7 @@
   display: flex;
   gap: clamp(8px, 0.6vw, 14px);
   flex-wrap: wrap;
+  flex-shrink: 0;
 }
 
 .project-detail-tech-icon {
@@ -3751,16 +3752,43 @@
   color: #fff;
 }
 
+.project-detail-summary {
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.project-detail-summary-scroll {
+  min-height: 0;
+  flex: 1;
+  margin-top: clamp(12px, 0.85vw, 18px);
+  padding-right: clamp(4px, 0.35vw, 8px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+
+.project-detail-footer {
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: clamp(14px, 1vw, 22px);
+  margin-top: auto;
+  padding-top: clamp(4px, 0.3vw, 8px);
+}
+
 .project-detail-status {
-  position: absolute;
-  bottom: clamp(20px, 1.4vw, 30px);
-  right: clamp(20px, 1.4vw, 30px);
+  flex-shrink: 0;
+  margin-left: auto;
   display: flex;
   align-items: center;
   gap: clamp(8px, 0.55vw, 12px);
   font-size: clamp(13px, 0.85vw, 18px);
   color: rgba(255, 255, 255, 0.5);
-  z-index: 2;
+  white-space: nowrap;
 }
 
 .project-detail-status-dot {
@@ -3782,8 +3810,6 @@
   font-size: clamp(14px, 0.9vw, 22px);
   color: rgba(255, 255, 255, 0.55);
   line-height: 1.8;
-  max-height: clamp(260px, 35vh, 480px);
-  overflow-y: auto;
   word-break: break-word;
 }
 
@@ -3853,13 +3879,13 @@
   background: rgba(255, 255, 255, 0.03);
 }
 
-.project-detail-desc::-webkit-scrollbar {
+.project-detail-summary-scroll::-webkit-scrollbar {
   width: 5px;
 }
-.project-detail-desc::-webkit-scrollbar-track {
+.project-detail-summary-scroll::-webkit-scrollbar-track {
   background: transparent;
 }
-.project-detail-desc::-webkit-scrollbar-thumb {
+.project-detail-summary-scroll::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.15);
   border-radius: 3px;
 }
@@ -3888,10 +3914,9 @@
 
 .project-detail-actions {
   display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
   gap: clamp(12px, 0.85vw, 18px);
-  margin-top: auto;
-  padding-top: clamp(16px, 1.1vw, 24px);
-  padding-bottom: clamp(4px, 0.3vw, 8px);
 }
 
 .project-detail-btn {
@@ -7710,13 +7735,13 @@
   .project-detail-right {
     padding: 20px 24px;
     min-height: 0;
+    overflow: hidden;
   }
   .project-detail-title {
     font-size: 22px;
   }
   .project-detail-desc {
     max-height: none;
-    overflow-y: visible;
   }
 
   /* Resume */
@@ -7786,11 +7811,12 @@
   }
   .project-detail-card {
     width: 100%;
-    height: 92vh;
+    height: min(92dvh, calc(100dvh - 24px));
     border-radius: 10px;
   }
   .project-detail-left {
     padding: 16px;
+    flex-shrink: 0;
   }
   .project-detail-icon,
   .project-detail-icon-fallback {
@@ -7800,6 +7826,7 @@
   .project-detail-right {
     padding: 16px;
     gap: 12px;
+    overflow: hidden;
   }
   .project-detail-title {
     font-size: 18px;
@@ -7816,18 +7843,26 @@
   }
   .project-detail-desc {
     font-size: 13px;
-    max-height: 150px;
+    max-height: none;
+  }
+  .project-detail-summary-scroll {
+    margin-top: 10px;
+    padding-right: 4px;
+    -webkit-overflow-scrolling: touch;
   }
   .project-detail-btn {
-    padding: 8px 16px;
+    padding: 8px 12px;
     font-size: 13px;
+    white-space: nowrap;
   }
   .project-detail-actions {
-    padding-bottom: 30px;
+    flex: 1;
+    gap: 8px;
   }
-  .project-detail-status {
-    right: 14px;
-    bottom: 12px;
+  .project-detail-footer {
+    align-items: center;
+    gap: 10px;
+    padding-top: 8px;
   }
 
   /* Resume */

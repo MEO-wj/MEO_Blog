@@ -2,30 +2,32 @@ name: CI
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-      - dev
-    paths:
-      - "backend/**"
-      - "docker/**"
-      - "docker-compose*.yml"
-      - "model/**"
-      - "web/**"
-      - ".github/workflows/ci.yml"
-      - ".github/workflows/deploy.yml"
-  pull_request:
-    branches:
-      - main
-      - dev
-    paths:
-      - "backend/**"
-      - "docker/**"
-      - "docker-compose*.yml"
-      - "model/**"
-      - "web/**"
-      - ".github/workflows/ci.yml"
-      - ".github/workflows/deploy.yml"
+  # TEMPORARILY DISABLED: uncomment the push and pull_request blocks below
+  # to restore automatic CI. Manual runs remain available in GitHub Actions.
+  # push:
+  #   branches:
+  #     - main
+  #     - dev
+  #   paths:
+  #     - "backend/**"
+  #     - "docker/**"
+  #     - "docker-compose*.yml"
+  #     - "model/**"
+  #     - "web/**"
+  #     - ".github/workflows/ci.yml"
+  #     - ".github/workflows/deploy.yml"
+  # pull_request:
+  #   branches:
+  #     - main
+  #     - dev
+  #   paths:
+  #     - "backend/**"
+  #     - "docker/**"
+  #     - "docker-compose*.yml"
+  #     - "model/**"
+  #     - "web/**"
+  #     - ".github/workflows/ci.yml"
+  #     - ".github/workflows/deploy.yml"
 
 permissions:
   contents: read

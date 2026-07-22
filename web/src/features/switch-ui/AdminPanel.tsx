@@ -14,6 +14,7 @@ const ACCENT_COLORS = [
   "#24c9f4", "#6c72ff", "#ff5c88", "#2fcf7f",
   "#f0782d", "#f4b740", "#a9abb8", "#35d39a",
 ];
+const MAX_PROJECTS = 100;
 
 export function AdminPanel({ onClose }: AdminPanelProps) {
   const [tab, setTab] = useState<"profile" | "projects" | "partners" | "permissions">("profile");
@@ -528,9 +529,14 @@ function ProjectManager({ onSave }: { onSave: (p: ProjectSummary[]) => void }) {
   return (
     <div className="admin-project-list">
       <div className="admin-project-list-header">
-        <strong>项目列表 ({projects.length})</strong>
-        <button type="button" onClick={() => setCreating(true)}>
-          + 新增项目
+        <strong>项目列表 ({projects.length} / {MAX_PROJECTS})</strong>
+        <button
+          type="button"
+          onClick={() => setCreating(true)}
+          disabled={projects.length >= MAX_PROJECTS}
+          title={projects.length >= MAX_PROJECTS ? "最多只能创建 100 个项目" : undefined}
+        >
+          {projects.length >= MAX_PROJECTS ? "已达到项目上限" : "+ 新增项目"}
         </button>
       </div>
       {projects.length === 0 && (

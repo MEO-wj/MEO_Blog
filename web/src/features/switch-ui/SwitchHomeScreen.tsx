@@ -18,6 +18,7 @@ import { ProjectCard } from "./ProjectCard";
 import { ActionButton } from "./ActionButton";
 import { AdminPanel } from "./AdminPanel";
 import { ProjectDetail } from "./ProjectDetail";
+import { ProjectLibrary, ProjectLibraryButton } from "./ProjectLibrary";
 import { GitHubProfile } from "./GitHubProfile";
 import { BlogBookshelf } from "./BlogBookshelf";
 import { MessageWallModal } from "./MessageWallModal";
@@ -43,6 +44,7 @@ interface SwitchHomeScreenProps {
 type FocusZone = "projects" | "actions";
 
 const MIN_PROJECT_SLOTS = 5;
+const HOME_PROJECT_LIMIT = 12;
 const GITHUB_HOME_URL = "https://github.com/meo-blog";
 
 function extractGithubUsername(url?: string): string | null {
@@ -137,6 +139,7 @@ export function SwitchHomeScreen({
   const [sessionChecking, setSessionChecking] = useState(false);
   const [detailProject, setDetailProject] = useState<Project | SwitchHomeProject | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [showProjectLibrary, setShowProjectLibrary] = useState(false);
   const [showGithub, setShowGithub] = useState(false);
   const [showBlog, setShowBlog] = useState(false);
   const [showGuestbook, setShowGuestbook] = useState(false);
@@ -203,8 +206,13 @@ export function SwitchHomeScreen({
     return () => window.removeEventListener("site-permissions-updated", onPermissionsUpdated);
   }, []);
 
-  const projectItems = useMemo(() => {
+  const allProjects = useMemo(() => {
     const source = storeProjects.length > 0 ? storeProjects : switchHomeProjects;
+    return source.filter((project) => !project.id.startsWith("empty-"));
+  }, [storeProjects]);
+
+  const projectItems = useMemo(() => {
+    const source = (storeProjects.length > 0 ? storeProjects : switchHomeProjects).slice(0, HOME_PROJECT_LIMIT);
     if (source.length >= MIN_PROJECT_SLOTS) return source;
 
     return [
@@ -216,7 +224,10 @@ export function SwitchHomeScreen({
     ];
   }, [storeProjects]);
 
-  const currentProject = projectItems[selectedProject] ?? projectItems[0];
+  const moreProjectIndex = projectItems.length;
+  const projectNavigationCount = projectItems.length + 1;
+  const activeProjectIndex = hoveredProject >= 0 ? hoveredProject : selectedProject;
+  const currentProject = projectItems[activeProjectIndex] ?? projectItems[0];
   const visibleActions = switchHomeActions;
   const currentAction = visibleActions[selectedAction] ?? visibleActions[0];
   const beijingNow = useMemo(() => {
@@ -268,6 +279,7 @@ export function SwitchHomeScreen({
     setFocusZone("projects");
     setSettingsOpen(false);
     setAdminPromptOpen(false);
+    setShowProjectLibrary(false);
     resetAdminGate();
     setAdminErrorPulse(false);
     setAdminAuthStatus("idle");
@@ -332,6 +344,14 @@ export function SwitchHomeScreen({
         return;
       }
 
+      if (showProjectLibrary) {
+        if (event.key === "Escape") {
+          playSound("close");
+          setShowProjectLibrary(false);
+        }
+        return;
+      }
+
       if (adminPromptOpen) {
         if (event.key === "Escape") {
           setAdminPromptOpen(false);
@@ -371,7 +391,7 @@ export function SwitchHomeScreen({
         event.preventDefault();
         if (focusZone === "projects") {
           setSelectedProject((value) =>
-            value === 0 ? projectItems.length - 1 : value - 1,
+            value <= 0 ? projectNavigationCount - 1 : value - 1,
           );
         } else {
           if (visibleActions.length === 0) return;
@@ -384,7 +404,7 @@ export function SwitchHomeScreen({
       if (event.key === "ArrowRight") {
         event.preventDefault();
         if (focusZone === "projects") {
-          setSelectedProject((value) => (value + 1) % projectItems.length);
+          setSelectedProject((value) => (value + 1) % projectNavigationCount);
         } else {
           if (visibleActions.length === 0) return;
           setSelectedAction((value) => (value + 1) % visibleActions.length);
@@ -404,7 +424,11 @@ export function SwitchHomeScreen({
       if (event.key === "Enter") {
         event.preventDefault();
         if (focusZone === "projects") {
-          goToRoute(currentProject.route);
+          if (selectedProject === moreProjectIndex) {
+            setShowProjectLibrary(true);
+          } else if (currentProject.icon !== "empty") {
+            void openProjectDetail(currentProject);
+          }
         } else if (currentAction) {
           activateAction(currentAction.id);
         }
@@ -412,13 +436,13 @@ export function SwitchHomeScreen({
 
       if (event.key.toLowerCase() === "g") {
         event.preventDefault();
-        openExternal(currentProject.repoUrl);
+        if (selectedProject !== moreProjectIndex) openExternal(currentProject.repoUrl);
       }
     }
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [adminPromptOpen, currentAction?.id, currentProject, detailProject, focusZone, focused, onRequestExit, playSound, projectItems.length, showBlog, showFavorites, showGithub, showGuestbook, showResume, visibleActions.length]);
+  }, [adminPromptOpen, currentAction?.id, currentProject, detailProject, focusZone, focused, moreProjectIndex, onRequestExit, playSound, projectNavigationCount, selectedProject, showBlog, showFavorites, showGithub, showGuestbook, showProjectLibrary, showResume, visibleActions.length]);
 
   function resetAdminGate() {
     adminGateCodeRef.current = "";
@@ -539,6 +563,26 @@ export function SwitchHomeScreen({
     }
 
     openAdminPrompt();
+  }
+
+  async function openProjectDetail(project: SwitchHomeProject) {
+    if (!focused) {
+      onRequestFocus();
+      return;
+    }
+    if (project.icon === "empty" && !project.slug) return;
+
+    setDetailProject(project);
+    setDetailLoading(true);
+    if (project.slug) {
+      try {
+        const full = await api.getProjectDetail(project.slug);
+        setDetailProject(full);
+      } catch {
+        // Keep showing summary data when detail loading fails.
+      }
+    }
+    setDetailLoading(false);
   }
 
   const activateAction = useCallback((actionId: string) => {
@@ -704,7 +748,7 @@ export function SwitchHomeScreen({
       <main className="switch-main">
         <div
           ref={projectRailRef}
-          className={`switch-project-rail ${hoveredProject >= 0 ? "has-hover" : ""} ${projectDragging ? "is-dragging" : ""}`}
+          className={`switch-project-rail ${hoveredProject >= 0 ? "has-hover" : ""} ${hoveredProject === moreProjectIndex ? "has-more-hover" : ""} ${projectDragging ? "is-dragging" : ""}`}
           role="list"
           aria-label="项目"
           onPointerDown={handleProjectPointerDown}
@@ -738,24 +782,32 @@ export function SwitchHomeScreen({
                 setHoveredProject(-1);
               }}
               onOpen={async () => {
-                if (!focused) { onRequestFocus(); return; }
-                if (project.icon === "empty") return;
-                // Show detail modal immediately with summary data
-                setDetailProject(project);
-                setDetailLoading(true);
-                if (project.slug) {
-                  try {
-                    const full = await api.getProjectDetail(project.slug);
-                    setDetailProject(full);
-                  } catch { /* keep showing summary */ }
-                }
-                setDetailLoading(false);
+                await openProjectDetail(project);
               }}
               onOpenRepo={() => openExternal(project.repoUrl)}
               onHoverSound={playProjectHover}
               onClickSound={project.icon !== "empty" ? playProjectClick : undefined}
             />
           ))}
+          <ProjectLibraryButton
+            selected={focusZone === "projects" && hoveredProject === moreProjectIndex}
+            dragging={projectDragging}
+            onSelect={() => {
+              setFocusZone("projects");
+              setSelectedProject(moreProjectIndex);
+              setHoveredProject(moreProjectIndex);
+            }}
+            onDeselect={() => setHoveredProject(-1)}
+            onOpen={() => {
+              if (!focused) {
+                onRequestFocus();
+                return;
+              }
+              setShowProjectLibrary(true);
+            }}
+            onHoverSound={playProjectHover}
+            onClickSound={playProjectClick}
+          />
         </div>
       </main>
 
@@ -911,6 +963,14 @@ export function SwitchHomeScreen({
       {permissionDenied && createPortal(
         <span className="switch-permission-toast">权限不足，无法访问</span>,
         document.body,
+      )}
+
+      {showProjectLibrary && (
+        <ProjectLibrary
+          projects={allProjects}
+          onClose={() => { playSound("close"); setShowProjectLibrary(false); }}
+          onOpenProject={(project) => { playProjectClick(); void openProjectDetail(project); }}
+        />
       )}
 
       {detailProject && createPortal(

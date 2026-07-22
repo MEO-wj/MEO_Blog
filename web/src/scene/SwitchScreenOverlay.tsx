@@ -53,12 +53,16 @@ export function SwitchScreenOverlay({
       <Html
         transform
         center
-        occlude={false}
+        occlude
         position={SCREEN_POSITION}
         rotation={SCREEN_ROTATION}
         scale={0.085}
         zIndexRange={[30, 0]}
         pointerEvents="auto"
+        style={{
+          backfaceVisibility: "hidden",
+          WebkitBackfaceVisibility: "hidden",
+        }}
       >
         <div
           className="switch-screen-html-surface"

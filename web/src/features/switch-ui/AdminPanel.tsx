@@ -15,6 +15,7 @@ const ACCENT_COLORS = [
   "#f0782d", "#f4b740", "#a9abb8", "#35d39a",
 ];
 const MAX_PROJECTS = 100;
+const MAX_PROJECT_MARKDOWN_SIZE = 2 * 1024 * 1024;
 
 export function AdminPanel({ onClose }: AdminPanelProps) {
   const [tab, setTab] = useState<"profile" | "projects" | "partners" | "permissions">("profile");
@@ -865,6 +866,7 @@ function ProjectForm({
   onSaved: (p: Project) => void;
   onSaveError?: (id: string) => void;
 }) {
+  const originalRef = useRef<ProjectCreate | null>(null);
   const [form, setForm] = useState<ProjectCreate>(() => {
     const initial = {
       name: project?.name ?? "",
@@ -885,8 +887,12 @@ function ProjectForm({
   const [showPicker, setShowPicker] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [pendingIconFile, setPendingIconFile] = useState<File | null>(null);
+  const [descriptionFileName, setDescriptionFileName] = useState(
+    project?.description ? `${project.slug || "project"}-intro.md` : "",
+  );
+  const [descriptionFileError, setDescriptionFileError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
-  const originalRef = useRef<ProjectCreate | null>(null);
+  const descriptionFileRef = useRef<HTMLInputElement>(null);
   const pendingIconUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -912,6 +918,9 @@ function ProjectForm({
         techStack: full.techStack ?? [],
       };
       setForm(fullForm);
+      if (fullForm.description) {
+        setDescriptionFileName(`${full.slug || "project"}-intro.md`);
+      }
       originalRef.current = fullForm;
     }).catch(() => {}).finally(() => setDetailLoading(false));
   }, [project?.slug]);
@@ -935,6 +944,35 @@ function ProjectForm({
       pendingIconUrlRef.current = previewUrl;
       setPendingIconFile(file);
       setForm((f) => ({ ...f, iconUrl: previewUrl }));
+    }
+  }
+
+  async function handleDescriptionFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const input = e.currentTarget;
+    const file = input.files?.[0];
+    input.value = "";
+    if (!file) return;
+
+    if (!/\.(md|markdown)$/i.test(file.name)) {
+      setDescriptionFileError("请选择 .md 或 .markdown 文档");
+      return;
+    }
+    if (file.size > MAX_PROJECT_MARKDOWN_SIZE) {
+      setDescriptionFileError("Markdown 文档不能超过 2 MB");
+      return;
+    }
+
+    try {
+      const description = (await file.text()).replace(/^\uFEFF/, "");
+      if (!description.trim()) {
+        setDescriptionFileError("Markdown 文档内容不能为空");
+        return;
+      }
+      setForm((current) => ({ ...current, description }));
+      setDescriptionFileName(file.name);
+      setDescriptionFileError("");
+    } catch {
+      setDescriptionFileError("文档读取失败，请重新选择");
     }
   }
 
@@ -1028,8 +1066,8 @@ function ProjectForm({
           />
         </label>
       </div>
-      <label>
-        <span>项目简介（支持 Markdown 格式）</span>
+      <div className="admin-project-markdown-field">
+        <span className="admin-project-markdown-label">项目简介（上传 Markdown 文档）</span>
         {detailLoading ? (
           <div className="admin-detail-skeleton">
             <div className="admin-skeleton-line" />
@@ -1037,15 +1075,38 @@ function ProjectForm({
             <div className="admin-skeleton-line" />
           </div>
         ) : (
-          <textarea
-            rows={6}
-            value={form.description}
-            onChange={(e) =>
-              setForm((f) => ({ ...f, description: e.target.value }))
-            }
-          />
+          <>
+            <input
+              ref={descriptionFileRef}
+              type="file"
+              accept=".md,.markdown,text/markdown"
+              hidden
+              onChange={handleDescriptionFile}
+            />
+            <button
+              type="button"
+              className={`admin-markdown-upload${descriptionFileError ? " has-error" : ""}`}
+              onClick={() => descriptionFileRef.current?.click()}
+            >
+              <span className="admin-markdown-upload-icon">MD</span>
+              <span className="admin-markdown-upload-copy">
+                <strong>{descriptionFileName || "选择 Markdown 文档"}</strong>
+                <span>
+                  {form.description
+                    ? `已读取 ${form.description.length.toLocaleString()} 个字符，点击可替换`
+                    : "点击上传 .md 或 .markdown 文件，最大 2 MB"}
+                </span>
+              </span>
+              <span className="admin-markdown-upload-action">
+                {form.description ? "重新上传" : "选择文件"}
+              </span>
+            </button>
+            {descriptionFileError && (
+              <span className="admin-markdown-upload-error">{descriptionFileError}</span>
+            )}
+          </>
         )}
-      </label>
+      </div>
       <div className="admin-form-row">
         <label>
           <span>GitHub 链接</span>

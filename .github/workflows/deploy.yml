@@ -7,15 +7,13 @@ on:
         description: Full main-branch commit SHA that has already passed CI
         required: true
         type: string
-  # TEMPORARILY DISABLED: uncomment the workflow_run block below to restore
-  # automatic production deployment after a successful main-branch CI run.
-  # workflow_run:
-  #   workflows:
-  #     - CI
-  #   branches:
-  #     - main
-  #   types:
-  #     - completed
+  workflow_run:
+    workflows:
+      - CI
+    branches:
+      - main
+    types:
+      - completed
 
 permissions:
   contents: read

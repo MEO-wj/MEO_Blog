@@ -8,6 +8,7 @@ import {
   type FormEvent,
 } from "react";
 import { createPortal } from "react-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { api } from "../../api/client";
 import type { Project } from "../../api/types";
 import { useAdminStore } from "../../stores/adminStore";
@@ -19,8 +20,10 @@ import { MobileActionDock } from "./MobileActionDock";
 import { MobileBlogReader } from "./MobileBlogReader";
 import { ProjectDetail } from "./ProjectDetail";
 import { ResumeModal } from "./ResumeModal";
+import { FavoritesModal } from "./FavoritesModal";
 import { SaveToast } from "./SaveToast";
 import { DEFAULT_SITE_PERMISSIONS, isActionAllowed } from "./entryPermissions";
+import { actionIdForRoute, getSwitchRouteState, routeForAction } from "./switchRoutes";
 import {
   switchHomeActions,
   switchHomeProjects,
@@ -90,6 +93,9 @@ function isRealProject(project: SwitchHomeProject) {
 
 export function MobileSwitchAppHome() {
   const { play: playSound } = useSound();
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const routeState = useMemo(() => getSwitchRouteState(pathname), [pathname]);
   const passwordInputRef = useRef<HTMLInputElement | null>(null);
   const adminGateCodeRef = useRef("");
   const detailRequestRef = useRef(0);
@@ -114,6 +120,7 @@ export function MobileSwitchAppHome() {
   const [showBlog, setShowBlog] = useState(false);
   const [showGuestbook, setShowGuestbook] = useState(false);
   const [showResume, setShowResume] = useState(false);
+  const [showFavorites, setShowFavorites] = useState(false);
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
   const [adminPromptOpen, setAdminPromptOpen] = useState(false);
   const [adminPanelOpen, setAdminPanelOpen] = useState(false);
@@ -183,6 +190,35 @@ export function MobileSwitchAppHome() {
     const timer = window.setTimeout(() => setPermissionDenied(false), 1800);
     return () => window.clearTimeout(timer);
   }, [permissionDenied]);
+  useEffect(() => {
+    const actionId = actionIdForRoute(routeState.kind);
+    if (actionId && !isAdminAuthenticated && !isActionAllowed(actionId, permissions)) {
+      setPermissionDenied(false);
+      window.setTimeout(() => setPermissionDenied(true), 0);
+      navigate("/", { replace: true });
+      return;
+    }
+
+    setShowGithub(routeState.kind === "github");
+    setShowBlog(routeState.kind === "blog" || routeState.kind === "post");
+    setShowGuestbook(routeState.kind === "guestbook");
+    setShowResume(routeState.kind === "resume");
+    setShowFavorites(routeState.kind === "favorites");
+
+    if (routeState.kind !== "project") {
+      setDetailProject(null);
+      setDetailLoading(false);
+    }
+    if (routeState.kind === "admin") {
+      void openAdminArea();
+    } else {
+      setAdminPanelOpen(false);
+    }
+  }, [isAdminAuthenticated, navigate, permissions, routeState.kind]);
+
+  function closeRouteModal() {
+    navigate("/");
+  }
 
   const projectItems = useMemo(() => {
     const source = storeProjects.length > 0 ? storeProjects : switchHomeProjects;
@@ -312,11 +348,11 @@ export function MobileSwitchAppHome() {
     }
     const ghUsername = extractGithubUsername(profile?.githubUrl);
     if (ghUsername) {
-      setShowGithub(true);
+      navigate("/github");
     } else {
       openExternal(GITHUB_HOME_URL);
     }
-  }, [isAdminAuthenticated, permissions.github, profile?.githubUrl]);
+  }, [isAdminAuthenticated, navigate, permissions.github, profile?.githubUrl]);
 
   const openProject = useCallback(async (project: SwitchHomeProject) => {
     if (!isRealProject(project)) return;
@@ -342,6 +378,14 @@ export function MobileSwitchAppHome() {
     }
   }, [playSound]);
 
+  useEffect(() => {
+    if (routeState.kind !== "project" || !routeState.projectId) return;
+    const project = projectItems.find((item) => item.id === routeState.projectId);
+    if (!project) return;
+    const currentId = detailProject && "id" in detailProject ? detailProject.id : "";
+    if (currentId === project.id && !detailLoading) return;
+    void openProject(project);
+  }, [detailLoading, detailProject, openProject, projectItems, routeState.kind, routeState.projectId]);
   const activateAction = useCallback((actionId: string) => {
     setAvatarMenuOpen(false);
     playSound("action-click");
@@ -357,30 +401,16 @@ export function MobileSwitchAppHome() {
       return;
     }
 
-    if (actionId === "resume") {
-      setShowResume(true);
-      return;
-    }
-
-    if (actionId === "blog") {
-      setShowBlog(true);
-      return;
-    }
-
-    if (actionId === "contact") {
-      setShowGuestbook(true);
-      return;
-    }
-
-    if (actionId === "admin") {
-      void openAdminArea();
-      return;
-    }
-
     if (actionId === "power") {
       pageRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+      return;
     }
-  }, [isAdminAuthenticated, openGithubProfile, permissions, playSound]);
+
+    if (actionId === "admin" && sessionChecking) return;
+
+    const route = routeForAction(actionId);
+    if (route) navigate(route);
+  }, [isAdminAuthenticated, navigate, openGithubProfile, permissions, playSound, sessionChecking]);
 
   return (
     <section ref={pageRef} className="mobile-switch-app" aria-label="MEO Blog mobile home">
@@ -495,7 +525,7 @@ export function MobileSwitchAppHome() {
                   onFocus={() => setSelectedProjectId(project.id)}
                   onClick={() => {
                     setSelectedProjectId(project.id);
-                    void openProject(project);
+                    navigate(`/projects/${project.id}`);
                   }}
                 >
                   <span className="mobile-project-square-art">
@@ -566,11 +596,11 @@ export function MobileSwitchAppHome() {
       />
 
       {adminPromptOpen && createPortal(
-        <div className="mobile-admin-backdrop" onClick={closeAdminPrompt}>
+        <div className="mobile-admin-backdrop" onClick={() => { closeAdminPrompt(); closeRouteModal(); }}>
           <form className="mobile-admin-card" onSubmit={handleAdminLogin} onClick={(event) => event.stopPropagation()}>
             <div className="mobile-admin-header">
               <strong>Admin</strong>
-              <button type="button" aria-label="关闭" onClick={closeAdminPrompt}>
+              <button type="button" aria-label="关闭" onClick={() => { closeAdminPrompt(); closeRouteModal(); }}>
                 ×
               </button>
             </div>
@@ -609,7 +639,7 @@ export function MobileSwitchAppHome() {
             )}
 
             <div className="mobile-admin-actions">
-              <button type="button" onClick={closeAdminPrompt}>
+              <button type="button" onClick={() => { closeAdminPrompt(); closeRouteModal(); }}>
                 取消
               </button>
               <button type="submit" disabled={adminAuthStatus === "submitting"}>
@@ -622,7 +652,7 @@ export function MobileSwitchAppHome() {
       )}
 
       {adminPanelOpen && createPortal(
-        <AdminPanel onClose={() => { playSound("close"); setAdminPanelOpen(false); }} />,
+        <AdminPanel onClose={() => { playSound("close"); closeRouteModal(); }} />,
         document.body,
       )}
 
@@ -637,11 +667,7 @@ export function MobileSwitchAppHome() {
         <ProjectDetail
           project={detailProject}
           loading={detailLoading}
-          onClose={() => {
-            playSound("close");
-            setDetailProject(null);
-            setDetailLoading(false);
-          }}
+          onClose={() => { playSound("close"); closeRouteModal(); }}
         />,
         document.body,
       )}
@@ -652,24 +678,34 @@ export function MobileSwitchAppHome() {
           <GitHubProfile
             username={ghUsername}
             enableContributionClickPopover
-            onClose={() => { playSound("close"); setShowGithub(false); }}
+            onClose={() => { playSound("close"); closeRouteModal(); }}
           />,
           document.body,
         ) : null;
       })()}
 
       {showBlog && createPortal(
-        <MobileBlogReader onClose={() => { playSound("close"); setShowBlog(false); }} />,
+        <MobileBlogReader
+          initialPostId={routeState.kind === "post" ? routeState.postId : undefined}
+          onOpenPost={(post) => navigate(`/posts/${post.id}`)}
+          onBackToBlog={() => navigate("/blog")}
+          onClose={() => { playSound("close"); closeRouteModal(); }}
+        />,
         document.body,
       )}
 
       {showGuestbook && createPortal(
-        <MessageWallModal onClose={() => { playSound("close"); setShowGuestbook(false); }} />,
+        <MessageWallModal onClose={() => { playSound("close"); closeRouteModal(); }} />,
         document.body,
       )}
 
       {showResume && createPortal(
-        <ResumeModal onClose={() => { playSound("close"); setShowResume(false); }} />,
+        <ResumeModal onClose={() => { playSound("close"); closeRouteModal(); }} />,
+        document.body,
+      )}
+
+      {showFavorites && createPortal(
+        <FavoritesModal onClose={() => { playSound("close"); closeRouteModal(); }} />,
         document.body,
       )}
 

@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react";
 import { Html } from "@react-three/drei";
 import * as THREE from "three";
+import type { SwitchRouteState } from "../features/switch-ui/switchRoutes";
 
 const SwitchHomeScreen = lazy(() =>
   import("../features/switch-ui/SwitchHomeScreen").then((m) => ({ default: m.SwitchHomeScreen })),
@@ -12,6 +13,8 @@ interface SwitchScreenOverlayProps {
   onRequestFocus: () => void;
   onRequestHome: () => void;
   onRequestExit: () => void;
+  routeState: SwitchRouteState;
+  onNavigate: (to: string, options?: { replace?: boolean }) => void;
 }
 
 const SCREEN_POSITION: [number, number, number] = [1.75, 7.432, -7.969];
@@ -47,6 +50,8 @@ export function SwitchScreenOverlay({
   onRequestFocus,
   onRequestHome,
   onRequestExit,
+  routeState,
+  onNavigate,
 }: SwitchScreenOverlayProps) {
   return (
     <>
@@ -78,6 +83,8 @@ export function SwitchScreenOverlay({
               presentation="preview"
               onRequestFocus={onRequestFocus}
               onRequestExit={onRequestExit}
+              routeState={routeState}
+              onNavigate={onNavigate}
             />
           </Suspense>
         </div>

@@ -226,6 +226,7 @@ export interface BlogComment {
   authorName: string;
   authorEmail: string;
   content: string;
+  moderationStatus: "pending" | "published";
   createdAt: string;
 }
 
@@ -233,6 +234,20 @@ export interface BlogCommentCreate {
   authorName: string;
   authorEmail?: string;
   content: string;
+}
+
+export interface BlogCommentModerationItem extends BlogComment {
+  postTitle: string;
+}
+
+export interface BlogCommentModerationStats {
+  pending: number;
+  published: number;
+}
+
+export interface BlogCommentModerationQueue {
+  stats: BlogCommentModerationStats;
+  comments: BlogCommentModerationItem[];
 }
 
 export interface GuestbookMessage {

@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import type { SceneLayout, LayoutItem } from "./types";
 import { ModelItem } from "./ModelItem";
 import { SwitchScreenOverlay } from "./SwitchScreenOverlay";
+import type { SwitchRouteState } from "../features/switch-ui/switchRoutes";
 
 function degToRad(deg: number): number {
   return (deg * Math.PI) / 180;
@@ -36,6 +37,8 @@ interface SceneLoaderProps {
   onRequestScreenFocus: () => void;
   onRequestScreenHome: () => void;
   onRequestScreenExit: () => void;
+  routeState: SwitchRouteState;
+  onNavigate: (to: string, options?: { replace?: boolean }) => void;
 }
 
 export function SceneLoader({
@@ -45,6 +48,8 @@ export function SceneLoader({
   onRequestScreenFocus,
   onRequestScreenHome,
   onRequestScreenExit,
+  routeState,
+  onNavigate,
 }: SceneLoaderProps) {
   const { roots, childrenOf } = useMemo(() => {
     const childrenMap = new Map<string, LayoutItem[]>();
@@ -74,6 +79,8 @@ export function SceneLoader({
         onRequestFocus={onRequestScreenFocus}
         onRequestHome={onRequestScreenHome}
         onRequestExit={onRequestScreenExit}
+        routeState={routeState}
+        onNavigate={onNavigate}
       />
     </>
   );

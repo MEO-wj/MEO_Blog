@@ -4,6 +4,7 @@ import { saveQueue } from "../../api/saveQueue";
 import type { AdminProfile, Partner, Project, ProjectCreate, ProjectSummary, ProjectUpdate, SitePermissions } from "../../api/types";
 import { useAdminStore } from "../../stores/adminStore";
 import { DEFAULT_SITE_PERMISSIONS } from "./entryPermissions";
+import { BlogCommentModeration } from "./BlogCommentModeration";
 import { useWheelScroll } from "./useWheelScroll";
 
 interface AdminPanelProps {
@@ -18,9 +19,16 @@ const MAX_PROJECTS = 100;
 const MAX_PROJECT_MARKDOWN_SIZE = 2 * 1024 * 1024;
 
 export function AdminPanel({ onClose }: AdminPanelProps) {
-  const [tab, setTab] = useState<"profile" | "projects" | "partners" | "permissions">("profile");
+  const [tab, setTab] = useState<"profile" | "projects" | "partners" | "comments" | "permissions">("profile");
   const { setProfile, setProjectSummaries, setPartners, logout } = useAdminStore();
   const scrollRef = useWheelScroll<HTMLDivElement>();
+  const [pendingBlogComments, setPendingBlogComments] = useState(0);
+
+  useEffect(() => {
+    api.getBlogCommentModeration()
+      .then((queue) => setPendingBlogComments(queue.stats.pending))
+      .catch(() => {});
+  }, []);
 
   async function handleLogout() {
     try {
@@ -70,6 +78,13 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
             合作伙伴
           </button>
           <button
+            className={tab === "comments" ? "active" : ""}
+            onClick={() => setTab("comments")}
+          >
+            评论审核
+            {pendingBlogComments > 0 && <span className="admin-tab-badge">{pendingBlogComments}</span>}
+          </button>
+          <button
             className={tab === "permissions" ? "active" : ""}
             onClick={() => setTab("permissions")}
           >
@@ -85,6 +100,9 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
           )}
           {tab === "partners" && (
             <PartnerManager onSave={(p) => setPartners(p)} />
+          )}
+          {tab === "comments" && (
+            <BlogCommentModeration onPendingChange={setPendingBlogComments} />
           )}
           {tab === "permissions" && (
             <PermissionManager />

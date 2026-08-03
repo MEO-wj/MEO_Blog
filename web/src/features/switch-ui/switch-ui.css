@@ -5254,6 +5254,39 @@
   flex-direction: column;
   gap: 21px;
 }
+.blog-markdown-upload-field {
+  --admin-ui: var(--blog-ui, 1px);
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--blog-ui, 1px) * 8);
+}
+.blog-markdown-upload {
+  min-height: calc(var(--blog-ui, 1px) * 102);
+  border-color: rgba(200, 170, 100, 0.42);
+  color: rgba(220, 200, 160, 0.72);
+  background:
+    linear-gradient(135deg, rgba(200, 170, 100, 0.09), transparent 52%),
+    rgba(36, 25, 12, 0.32);
+}
+.blog-markdown-upload:hover,
+.blog-markdown-upload:focus-visible {
+  border-color: rgba(220, 200, 160, 0.74);
+  background:
+    linear-gradient(135deg, rgba(200, 170, 100, 0.14), transparent 52%),
+    rgba(36, 25, 12, 0.46);
+  box-shadow: 0 0 0 2px rgba(200, 170, 100, 0.1);
+}
+.blog-markdown-upload .admin-markdown-upload-icon,
+.blog-markdown-upload .admin-markdown-upload-action {
+  border-color: rgba(200, 170, 100, 0.55);
+  color: rgba(230, 206, 150, 0.95);
+  background: rgba(200, 170, 100, 0.08);
+}
+.blog-markdown-upload .admin-markdown-upload-icon::after {
+  border-left-color: rgba(200, 170, 100, 0.55);
+  border-bottom-color: rgba(200, 170, 100, 0.55);
+  background: #1c1610;
+}
 .blog-editor-content {
   min-height: 450px;
   font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
@@ -8410,5 +8443,202 @@
   .switch-guestbook-submit {
     font-size: 9px;
     padding: 8px 16px;
+  }
+}
+/* Shared blog comment submission states */
+.blog-comments-empty {
+  margin: 0 0 18px;
+  color: var(--ns-muted);
+  font-size: 18px;
+}
+
+.blog-comment-form-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.blog-comment-form-footer > span {
+  color: #2f9e68;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.blog-comment-form-footer > span.is-error {
+  color: #f05a67;
+}
+
+/* Admin blog comment moderation */
+.admin-panel-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-tab-badge {
+  min-width: 20px;
+  height: 20px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 10px;
+  padding: 0 6px;
+  color: #101214;
+  background: #f4b740;
+  font-size: 11px;
+  line-height: 1;
+}
+
+.admin-comment-review {
+  display: grid;
+  gap: 14px;
+}
+
+.admin-comment-review .admin-project-list-header > div {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.admin-comment-review .admin-project-list-header span {
+  color: rgba(199, 255, 217, 0.55);
+  font-size: 12px;
+}
+
+.admin-comment-review-empty {
+  border: 1px dashed rgba(53, 211, 154, 0.28);
+  border-radius: 6px;
+  padding: 42px 18px;
+  color: rgba(199, 255, 217, 0.5);
+  text-align: center;
+}
+
+.admin-comment-post-group {
+  overflow: hidden;
+  border: 1px solid rgba(53, 211, 154, 0.24);
+  border-radius: 6px;
+  background: rgba(8, 10, 11, 0.58);
+}
+
+.admin-comment-post-group > header {
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  border-bottom: 1px solid rgba(53, 211, 154, 0.18);
+  padding: 10px 14px;
+  background: rgba(53, 211, 154, 0.06);
+}
+
+.admin-comment-post-group > header > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.admin-comment-post-group > header small {
+  color: rgba(199, 255, 217, 0.48);
+  font-size: 10px;
+}
+
+.admin-comment-post-group > header strong {
+  overflow: hidden;
+  color: #d9ffe9;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-comment-post-group > header > span {
+  flex: 0 0 auto;
+  border: 1px solid rgba(244, 183, 64, 0.4);
+  border-radius: 4px;
+  padding: 3px 7px;
+  color: #f4b740;
+  font-size: 11px;
+}
+
+.admin-comment-review-item {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+}
+
+.admin-comment-review-item + .admin-comment-review-item {
+  border-top: 1px solid rgba(53, 211, 154, 0.12);
+}
+
+.admin-comment-review-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+.admin-comment-review-meta strong {
+  color: #35d39a;
+}
+
+.admin-comment-review-meta span,
+.admin-comment-review-meta time {
+  color: rgba(199, 255, 217, 0.48);
+  font-size: 11px;
+}
+
+.admin-comment-review-meta time {
+  margin-left: auto;
+}
+
+.admin-comment-review-item p {
+  margin: 0;
+  color: #f1f1f3;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.admin-comment-review-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.admin-comment-review-actions button {
+  border: 1px solid #35d39a;
+  border-radius: 4px;
+  padding: 6px 12px;
+  color: #101214;
+  background: #35d39a;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.admin-comment-review-actions button.danger {
+  border-color: rgba(240, 90, 103, 0.55);
+  color: #ff9aa4;
+  background: transparent;
+}
+
+.admin-comment-review-actions button:disabled {
+  cursor: wait;
+  opacity: 0.5;
+}
+
+@media (max-width: 700px) {
+  .blog-comment-form-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .blog-comment-form-footer button {
+    width: 100%;
+  }
+
+  .admin-comment-review-meta time {
+    width: 100%;
+    margin-left: 0;
   }
 }

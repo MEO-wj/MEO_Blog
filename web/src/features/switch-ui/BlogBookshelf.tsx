@@ -1,24 +1,113 @@
-import { lazy, Suspense, useEffect, useState, type FormEvent } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import remarkGfm from "remark-gfm";
 
 const Markdown = lazy(() => import("react-markdown"));
 import { api } from "../../api/client";
 import { saveQueue } from "../../api/saveQueue";
-import type { BlogCategory, BlogCategoryCreate, BlogPost, BlogPostCreate, BlogComment } from "../../api/types";
+import type { BlogCategory, BlogCategoryCreate, BlogPost, BlogPostCreate } from "../../api/types";
 import { useAdminStore } from "../../stores/adminStore";
+import { BlogComments } from "./BlogComments";
 import { useWheelScroll } from "./useWheelScroll";
 
 interface BlogBookshelfProps {
   onClose: () => void;
+  initialPostId?: string;
+  onOpenPost?: (post: BlogPost) => void;
+  onBackToBlog?: () => void;
 }
 
 type View = "shelf" | "posts" | "reader" | "editor";
+
+const MAX_BLOG_MARKDOWN_SIZE = 2 * 1024 * 1024;
 
 function formatBookTitle(name: string) {
   return Array.from(name.trim()).slice(0, 10).join("");
 }
 
-export function BlogBookshelf({ onClose }: BlogBookshelfProps) {
+function autoSlug(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9一-鿿]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+function stripMarkdownSyntax(value: string) {
+  return value
+    .replace(/!\[[^\]]*]\([^)]*\)/g, "")
+    .replace(/\[([^\]]+)]\([^)]*\)/g, "$1")
+    .replace(/[`*_~>#-]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function summarizeMarkdown(content: string) {
+  const blocks = content.split(/\n\s*\n/);
+  for (const block of blocks) {
+    const lines = block
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) =>
+        line &&
+        !line.startsWith("#") &&
+        !line.startsWith("```") &&
+        !line.startsWith("|") &&
+        !line.startsWith("!")
+      );
+    const summary = stripMarkdownSyntax(lines.join(" "));
+    if (summary) return Array.from(summary).slice(0, 140).join("");
+  }
+  return "";
+}
+
+function parseMarkdownFrontMatter(raw: string) {
+  const content = raw.replace(/^\uFEFF/, "");
+  const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\s*(?:\r?\n|$)/);
+  if (!match) return { metadata: {} as Record<string, string>, body: content };
+
+  const metadata: Record<string, string> = {};
+  for (const line of match[1].split(/\r?\n/)) {
+    const field = line.match(/^([A-Za-z][\w-]*):\s*(.*)$/);
+    if (!field) continue;
+    const key = field[1].toLowerCase().replace(/[-_]/g, "");
+    const value = field[2].trim().replace(/^[ '\"]|[ '\"]$/g, "");
+    if (value) metadata[key] = value;
+  }
+
+  return { metadata, body: content.slice(match[0].length) };
+}
+
+function parseBlogMarkdownDocument(raw: string, fileName: string) {
+  const { metadata, body } = parseMarkdownFrontMatter(raw);
+  const contentMd = body.replace(/^\s+/, "");
+  const fileTitle = fileName.replace(/\.(md|markdown)$/i, "");
+  const firstHeading = contentMd.match(/^#\s+(.+)$/m)?.[1]?.trim();
+  const title = metadata.title || firstHeading || fileTitle;
+  const status = metadata.status === "published" || metadata.status === "draft"
+    ? metadata.status
+    : undefined;
+
+  return {
+    title,
+    slug: metadata.slug || autoSlug(title || fileTitle),
+    summary: metadata.summary || metadata.description || summarizeMarkdown(contentMd),
+    contentMd,
+    coverUrl: metadata.coverurl || metadata.cover || metadata.image || metadata.thumbnail,
+    category: metadata.categoryid || metadata.category,
+    status,
+  };
+}
+
+function resolveImportedCategoryId(value: string | undefined, categories: BlogCategory[]) {
+  if (!value) return "";
+  const normalized = value.trim().toLowerCase();
+  return categories.find((category) =>
+    category.id.toLowerCase() === normalized ||
+    category.slug.toLowerCase() === normalized ||
+    category.name.toLowerCase() === normalized
+  )?.id ?? "";
+}
+
+export function BlogBookshelf({ onClose, initialPostId, onOpenPost, onBackToBlog }: BlogBookshelfProps) {
   const [view, setView] = useState<View>("shelf");
   const [categories, setCategories] = useState<BlogCategory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,13 +128,13 @@ export function BlogBookshelf({ onClose }: BlogBookshelfProps) {
     // Fetch categories + all posts to compute postCount client-side
     Promise.all([
       api.getBlogCategoriesFresh(),
-      api.getBlogPosts(),
+      api.getBlogPostsFresh(),
     ]).then(([c, posts]) => {
       const countMap: Record<string, number> = {};
       for (const p of posts) {
         countMap[p.categoryId] = (countMap[p.categoryId] ?? 0) + 1;
       }
-      const withCount = c.map((cat) => ({ ...cat, postCount: cat.postCount || countMap[cat.id] || 0 }));
+      const withCount = c.map((cat) => ({ ...cat, postCount: countMap[cat.id] ?? cat.postCount ?? 0 }));
       setCategories(withCount);
       setLoading(false);
       setError(null);
@@ -54,6 +143,28 @@ export function BlogBookshelf({ onClose }: BlogBookshelfProps) {
       setError("加载失败，请检查网络");
     });
   }, [retryCount, postSaveSignal]);
+
+  useEffect(() => {
+    if (!initialPostId) return;
+
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    api.getBlogPost(initialPostId).then((post) => {
+      if (cancelled) return;
+      setSelectedPost(post);
+      setSelectedCategory((current) => current ?? categories.find((cat) => cat.id === post.categoryId) ?? null);
+      setView("reader");
+    }).catch(() => {
+      if (!cancelled) setError("文章加载失败，请检查链接");
+    }).finally(() => {
+      if (!cancelled) setLoading(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [initialPostId, categories]);
 
   function handleSaveComplete() {
     setPostSaveSignal((s) => s + 1);
@@ -67,6 +178,7 @@ export function BlogBookshelf({ onClose }: BlogBookshelfProps) {
   function handleSelectPost(post: BlogPost) {
     setSelectedPost(post);
     setView("reader");
+    onOpenPost?.(post);
   }
 
   function handleEditPost(post: BlogPost) {
@@ -87,7 +199,8 @@ export function BlogBookshelf({ onClose }: BlogBookshelfProps) {
       setEditingPost(null);
       setCreatingPost(false);
     } else if (view === "reader") {
-      setView("posts");
+      if (initialPostId) onBackToBlog?.();
+      setView(selectedCategory ? "posts" : "shelf");
       setSelectedPost(null);
     } else if (view === "posts") {
       setView("shelf");
@@ -396,7 +509,7 @@ function PostsView({
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetch = isAdmin ? api.adminGetBlogPosts : api.getBlogPosts;
+    const fetch = isAdmin ? api.adminGetBlogPostsFresh : api.getBlogPostsFresh;
     fetch(category.slug).then((p) => {
       setPosts(p);
       setLoading(false);
@@ -484,8 +597,6 @@ function ReaderView({
   isAdmin: boolean;
 }) {
   const [fullPost, setFullPost] = useState<BlogPost>(post);
-  const [comments, setComments] = useState<BlogComment[]>([]);
-  const [loadingComments, setLoadingComments] = useState(true);
 
   // Fetch full post content (list API omits content_md for efficiency)
   useEffect(() => {
@@ -494,20 +605,6 @@ function ReaderView({
     }).catch(() => {});
   }, [post.id]);
 
-  useEffect(() => {
-    api.getBlogComments(post.id).then((c) => {
-      setComments(c);
-      setLoadingComments(false);
-    }).catch(() => setLoadingComments(false));
-  }, [post.id]);
-
-  function handleCommentCreated(comment: BlogComment) {
-    setComments((prev) => [...prev, comment]);
-  }
-
-  function handleCommentDeleted(id: string) {
-    setComments((prev) => prev.filter((c) => c.id !== id));
-  }
 
   function formatDate(s: string) {
     return new Date(s).toLocaleDateString("zh-CN", {
@@ -536,98 +633,8 @@ function ReaderView({
         <div className="blog-scroll-ornament-bottom" />
       </div>
 
-      <div className="blog-comments">
-        <h3>评论 ({comments.length})</h3>
-        {loadingComments && <p className="blog-comments-loading">加载评论中...</p>}
-        {comments.map((c) => (
-          <div key={c.id} className="blog-comment">
-            <div className="blog-comment-header">
-              <span className="blog-comment-avatar">{c.authorName.charAt(0).toUpperCase()}</span>
-              <span className="blog-comment-name">{c.authorName}</span>
-              <span className="blog-comment-date">{formatDate(c.createdAt)}</span>
-              {isAdmin && (
-                <button
-                  className="blog-comment-delete"
-                  onClick={() => {
-                    api.deleteBlogComment(post.id, c.id).then(() => handleCommentDeleted(c.id)).catch((err: unknown) => {
-                      const msg = err instanceof Error ? err.message : "未知错误";
-                      if (msg.includes("session")) return;
-                      alert(`删除失败：${msg}`);
-                    });
-                  }}
-                >
-                  删除
-                </button>
-              )}
-            </div>
-            <div className="blog-comment-content">{c.content}</div>
-          </div>
-        ))}
-        <CommentForm postId={post.id} onCreated={handleCommentCreated} />
-      </div>
+      <BlogComments postId={post.id} isAdmin={isAdmin} />
     </div>
-  );
-}
-
-// --- Comment Form ---
-
-function CommentForm({
-  postId,
-  onCreated,
-}: {
-  postId: string;
-  onCreated: (c: BlogComment) => void;
-}) {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [content, setContent] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-
-  async function handleSubmit(ev: FormEvent) {
-    ev.preventDefault();
-    if (!name.trim() || !content.trim()) return;
-    setSubmitting(true);
-    try {
-      const comment = await api.createBlogComment(postId, {
-        authorName: name.trim(),
-        authorEmail: email.trim(),
-        content: content.trim(),
-      });
-      onCreated(comment);
-      setContent("");
-    } catch {
-      alert("评论提交失败");
-    }
-    setSubmitting(false);
-  }
-
-  return (
-    <form className="blog-comment-form" onSubmit={handleSubmit}>
-      <div className="blog-comment-form-row">
-        <input
-          placeholder="昵称 *"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          required
-        />
-        <input
-          placeholder="邮箱（可选）"
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-      </div>
-      <textarea
-        placeholder="写下你的评论..."
-        rows={3}
-        value={content}
-        onChange={(e) => setContent(e.target.value)}
-        required
-      />
-      <button type="submit" disabled={submitting}>
-        {submitting ? "提交中..." : "提交评论"}
-      </button>
-    </form>
   );
 }
 
@@ -657,7 +664,10 @@ function PostEditor({
     status: post?.status ?? "draft",
     categoryId: post?.categoryId ?? defaultCategoryId,
   });
+  const markdownFileRef = useRef<HTMLInputElement>(null);
   const [saving, setSaving] = useState(false);
+  const [markdownFileName, setMarkdownFileName] = useState("");
+  const [markdownFileError, setMarkdownFileError] = useState("");
 
   // Fetch full post content when editing (list API omits contentMd)
   useEffect(() => {
@@ -667,11 +677,43 @@ function PostEditor({
     }).catch(() => {});
   }, [post?.id]);
 
-  function autoSlug(title: string) {
-    return title
-      .toLowerCase()
-      .replace(/[^a-z0-9一-鿿]+/g, "-")
-      .replace(/^-|-$/g, "");
+  async function handleMarkdownFile(ev: ChangeEvent<HTMLInputElement>) {
+    const input = ev.currentTarget;
+    const file = input.files?.[0];
+    input.value = "";
+    if (!file) return;
+
+    if (!/\.(md|markdown)$/i.test(file.name)) {
+      setMarkdownFileError("请选择 .md 或 .markdown 文档");
+      return;
+    }
+    if (file.size > MAX_BLOG_MARKDOWN_SIZE) {
+      setMarkdownFileError("Markdown 文档不能超过 2 MB");
+      return;
+    }
+
+    try {
+      const imported = parseBlogMarkdownDocument(await file.text(), file.name);
+      if (!imported.contentMd.trim()) {
+        setMarkdownFileError("Markdown 文档内容不能为空");
+        return;
+      }
+      const categoryId = resolveImportedCategoryId(imported.category, categories);
+      setForm((current) => ({
+        ...current,
+        title: imported.title || current.title,
+        slug: imported.slug || current.slug,
+        summary: imported.summary || current.summary,
+        contentMd: imported.contentMd,
+        coverUrl: imported.coverUrl || current.coverUrl,
+        status: imported.status || current.status,
+        categoryId: categoryId || current.categoryId,
+      }));
+      setMarkdownFileName(file.name);
+      setMarkdownFileError("");
+    } catch {
+      setMarkdownFileError("文档读取失败，请重新选择");
+    }
   }
 
   async function handleSubmit(ev: FormEvent) {
@@ -706,6 +748,36 @@ function PostEditor({
         <strong>{post ? "编辑文章" : "撰写新文章"}</strong>
       </div>
       <div className="blog-editor-body">
+        <div className="blog-markdown-upload-field">
+          <input
+            ref={markdownFileRef}
+            type="file"
+            accept=".md,.markdown,text/markdown"
+            hidden
+            onChange={handleMarkdownFile}
+          />
+          <button
+            type="button"
+            className={`admin-markdown-upload blog-markdown-upload${markdownFileError ? " has-error" : ""}`}
+            onClick={() => markdownFileRef.current?.click()}
+          >
+            <span className="admin-markdown-upload-icon">MD</span>
+            <span className="admin-markdown-upload-copy">
+              <strong>{markdownFileName || "选择 Markdown 文档"}</strong>
+              <span>
+                {form.contentMd
+                  ? `当前正文 ${form.contentMd.length.toLocaleString()} 个字符，点击可替换`
+                  : "点击上传 .md 或 .markdown 文件，最大 2 MB"}
+              </span>
+            </span>
+            <span className="admin-markdown-upload-action">
+              {form.contentMd ? "重新上传" : "选择文件"}
+            </span>
+          </button>
+          {markdownFileError && (
+            <span className="admin-markdown-upload-error">{markdownFileError}</span>
+          )}
+        </div>
         <div className="blog-form-row">
           <label>
             <span>标题</span>

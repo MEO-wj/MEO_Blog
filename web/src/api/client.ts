@@ -1,4 +1,4 @@
-import type { APIResponse, AdminProfile, ProfileUpdate, SitePermissions, Project, ProjectSummary, ProjectCreate, ProjectUpdate, GHUser, GHRepo, GHContributions, BlogCategory, BlogCategoryCreate, BlogPost, BlogPostCreate, BlogPostUpdate, BlogComment, BlogCommentCreate, GuestbookMessage, GuestbookMessageCreate, GuestbookModerationQueue, GuestbookOwnerResponse, GuestbookReplyCreate, Favorite, Partner, PartnerUpdate } from "./types";
+import type { APIResponse, AdminProfile, ProfileUpdate, SitePermissions, Project, ProjectSummary, ProjectCreate, ProjectUpdate, GHUser, GHRepo, GHContributions, BlogCategory, BlogCategoryCreate, BlogPost, BlogPostCreate, BlogPostUpdate, BlogComment, BlogCommentCreate, BlogCommentModerationQueue, GuestbookMessage, GuestbookMessageCreate, GuestbookModerationQueue, GuestbookOwnerResponse, GuestbookReplyCreate, Favorite, Partner, PartnerUpdate } from "./types";
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? "/api/v1";
 const GET_TIMEOUT_MS = 12000;
@@ -425,8 +425,10 @@ export const api = {
   getBlogCategoriesFresh: () => request<BlogCategory[]>("/blog/categories", undefined, 2, 0),
   getBlogPosts: (categorySlug?: string) =>
     request<BlogPost[]>(`/blog/posts${categorySlug ? `?category=${categorySlug}` : ""}`, undefined, 2, 5 * 60 * 1000),
+  getBlogPostsFresh: (categorySlug?: string) =>
+    request<BlogPost[]>(`/blog/posts${categorySlug ? `?category=${categorySlug}` : ""}`, undefined, 2, 0),
   getBlogPost: (id: string) => request<BlogPost>(`/blog/posts/${id}`, undefined, 2, 0),
-  getBlogComments: (postId: string) => request<BlogComment[]>(`/blog/posts/${postId}/comments`, undefined, 2, 2 * 60 * 1000),
+  getBlogComments: (postId: string) => request<BlogComment[]>(`/blog/posts/${postId}/comments`, undefined, 2, 0),
   createBlogComment: async (postId: string, data: BlogCommentCreate) => {
     const result = await request<BlogComment>(`/blog/posts/${postId}/comments`, {
       method: "POST",
@@ -439,6 +441,8 @@ export const api = {
   // Blog (admin)
   adminGetBlogPosts: (categorySlug?: string) =>
     request<BlogPost[]>(`/admin/blog/posts${categorySlug ? `?category=${categorySlug}` : ""}`, undefined, 2, 5 * 60 * 1000),
+  adminGetBlogPostsFresh: (categorySlug?: string) =>
+    request<BlogPost[]>(`/admin/blog/posts${categorySlug ? `?category=${categorySlug}` : ""}`, undefined, 2, 0),
   createBlogCategory: async (data: BlogCategoryCreate) => {
     const result = await request<BlogCategory>("/admin/blog/categories", {
       method: "POST",
@@ -488,6 +492,13 @@ export const api = {
     invalidateCache("GET:/blog/categories");
     invalidateCache("GET:/admin/blog/posts");
     invalidateCache(`GET:/blog/posts/${id}`);
+  },
+  getBlogCommentModeration: () =>
+    request<BlogCommentModerationQueue>("/admin/blog/comments/moderation", undefined, 2, 0),
+  publishBlogComment: async (commentId: string) => {
+    const result = await request<BlogComment>(`/admin/blog/comments/${commentId}/publish`, { method: "POST" });
+    invalidateCache(`GET:/blog/posts/${result.postId}/comments`);
+    return result;
   },
   deleteBlogComment: async (postId: string, commentId: string) => {
     await request<void>(`/admin/blog/comments/${commentId}`, { method: "DELETE" });

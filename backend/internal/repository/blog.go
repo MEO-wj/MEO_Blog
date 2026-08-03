@@ -275,12 +275,28 @@ func DeleteBlogPost(ctx context.Context, db *pgxpool.Pool, id string) error {
 // --- BlogComment ---
 
 type BlogComment struct {
-	ID          string `json:"id"`
-	PostID      string `json:"postId"`
-	AuthorName  string `json:"authorName"`
-	AuthorEmail string `json:"authorEmail"`
-	Content     string `json:"content"`
-	CreatedAt   string `json:"createdAt"`
+	ID               string `json:"id"`
+	PostID           string `json:"postId"`
+	AuthorName       string `json:"authorName"`
+	AuthorEmail      string `json:"authorEmail"`
+	Content          string `json:"content"`
+	ModerationStatus string `json:"moderationStatus"`
+	CreatedAt        string `json:"createdAt"`
+}
+
+type BlogCommentModerationItem struct {
+	BlogComment
+	PostTitle string `json:"postTitle"`
+}
+
+type BlogCommentModerationStats struct {
+	Pending   int `json:"pending"`
+	Published int `json:"published"`
+}
+
+type BlogCommentModerationQueue struct {
+	Stats    BlogCommentModerationStats  `json:"stats"`
+	Comments []BlogCommentModerationItem `json:"comments"`
 }
 
 type BlogCommentCreate struct {
@@ -293,7 +309,7 @@ type BlogCommentCreate struct {
 func scanBlogComment(row pgx.Row) (*BlogComment, error) {
 	var c BlogComment
 	var createdAt time.Time
-	err := row.Scan(&c.ID, &c.PostID, &c.AuthorName, &c.AuthorEmail, &c.Content, &createdAt)
+	err := row.Scan(&c.ID, &c.PostID, &c.AuthorName, &c.AuthorEmail, &c.Content, &c.ModerationStatus, &createdAt)
 	if err != nil {
 		return nil, err
 	}
@@ -303,8 +319,10 @@ func scanBlogComment(row pgx.Row) (*BlogComment, error) {
 
 func ListBlogComments(ctx context.Context, db *pgxpool.Pool, postID string) ([]BlogComment, error) {
 	rows, err := db.Query(ctx,
-		`SELECT id, post_id, author_name, coalesce(author_email,''), content, created_at
-		 FROM blog_comments WHERE post_id = $1 ORDER BY created_at ASC`, postID,
+		`SELECT id, post_id, author_name, coalesce(author_email,''), content, moderation_status, created_at
+		 FROM blog_comments
+		 WHERE post_id = $1 AND moderation_status = 'published'
+		 ORDER BY created_at ASC`, postID,
 	)
 	if err != nil {
 		return nil, err
@@ -327,10 +345,62 @@ func ListBlogComments(ctx context.Context, db *pgxpool.Pool, postID string) ([]B
 
 func CreateBlogComment(ctx context.Context, db *pgxpool.Pool, c *BlogCommentCreate) (*BlogComment, error) {
 	return scanBlogComment(db.QueryRow(ctx,
-		`INSERT INTO blog_comments (post_id, author_name, author_email, content)
-		 VALUES ($1, $2, $3, $4)
-		 RETURNING id, post_id, author_name, coalesce(author_email,''), content, created_at`,
+		`INSERT INTO blog_comments (post_id, author_name, author_email, content, moderation_status)
+		 VALUES ($1, $2, $3, $4, 'pending')
+		 RETURNING id, post_id, author_name, coalesce(author_email,''), content, moderation_status, created_at`,
 		c.PostID, c.AuthorName, c.AuthorEmail, c.Content,
+	))
+}
+
+func GetBlogCommentModerationQueue(ctx context.Context, db *pgxpool.Pool) (BlogCommentModerationQueue, error) {
+	var queue BlogCommentModerationQueue
+	err := db.QueryRow(ctx,
+		`SELECT
+		 count(*) FILTER (WHERE moderation_status = 'pending')::int,
+		 count(*) FILTER (WHERE moderation_status = 'published')::int
+		 FROM blog_comments`,
+	).Scan(&queue.Stats.Pending, &queue.Stats.Published)
+	if err != nil {
+		return BlogCommentModerationQueue{}, err
+	}
+
+	rows, err := db.Query(ctx,
+		`SELECT c.id, c.post_id, c.author_name, coalesce(c.author_email,''), c.content,
+		 c.moderation_status, c.created_at, p.title
+		 FROM blog_comments c
+		 JOIN posts p ON p.id = c.post_id
+		 WHERE c.moderation_status = 'pending'
+		 ORDER BY c.created_at ASC`,
+	)
+	if err != nil {
+		return BlogCommentModerationQueue{}, err
+	}
+	defer rows.Close()
+
+	queue.Comments = []BlogCommentModerationItem{}
+	for rows.Next() {
+		var item BlogCommentModerationItem
+		var createdAt time.Time
+		err := rows.Scan(
+			&item.ID, &item.PostID, &item.AuthorName, &item.AuthorEmail, &item.Content,
+			&item.ModerationStatus, &createdAt, &item.PostTitle,
+		)
+		if err != nil {
+			return BlogCommentModerationQueue{}, err
+		}
+		item.CreatedAt = createdAt.Format(time.RFC3339)
+		queue.Comments = append(queue.Comments, item)
+	}
+	return queue, rows.Err()
+}
+
+func PublishBlogComment(ctx context.Context, db *pgxpool.Pool, id string) (*BlogComment, error) {
+	return scanBlogComment(db.QueryRow(ctx,
+		`UPDATE blog_comments
+		 SET moderation_status = 'published', reviewed_at = now()
+		 WHERE id = $1
+		 RETURNING id, post_id, author_name, coalesce(author_email,''), content, moderation_status, created_at`,
+		id,
 	))
 }
 

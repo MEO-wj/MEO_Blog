@@ -6,8 +6,6 @@ const SceneEntry = lazy(() => import("./scene/SceneEntry").then(m => ({ default:
 const MobileSwitchAppHome = lazy(() => import("./features/switch-ui/MobileSwitchAppHome").then(m => ({ default: m.MobileSwitchAppHome })));
 
 const DashboardPage = lazy(() => import("./features/dashboard/DashboardPage").then(m => ({ default: m.DashboardPage })));
-const PostsPage = lazy(() => import("./features/posts/PostsPage").then(m => ({ default: m.PostsPage })));
-const ProjectsPage = lazy(() => import("./features/projects/ProjectsPage").then(m => ({ default: m.ProjectsPage })));
 const GamesPage = lazy(() => import("./features/games/GamesPage").then(m => ({ default: m.GamesPage })));
 const AboutPage = lazy(() => import("./features/about/AboutPage").then(m => ({ default: m.AboutPage })));
 
@@ -75,10 +73,18 @@ export function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<HomeEntry />} />
+        <Route path="/github" element={<HomeEntry />} />
+        <Route path="/blog" element={<HomeEntry />} />
+        <Route path="/posts" element={<HomeEntry />} />
+        <Route path="/posts/:postId" element={<HomeEntry />} />
+        <Route path="/guestbook" element={<HomeEntry />} />
+        <Route path="/resume" element={<HomeEntry />} />
+        <Route path="/favorites" element={<HomeEntry />} />
+        <Route path="/admin" element={<HomeEntry />} />
+        <Route path="/projects" element={<HomeEntry />} />
+        <Route path="/projects/:projectId" element={<HomeEntry />} />
         <Route element={<Layout />}>
           <Route path="/dashboard" element={<Suspense fallback={<PageLoader />}><DashboardPage /></Suspense>} />
-          <Route path="/posts" element={<Suspense fallback={<PageLoader />}><PostsPage /></Suspense>} />
-          <Route path="/projects" element={<Suspense fallback={<PageLoader />}><ProjectsPage /></Suspense>} />
           <Route path="/games" element={<Suspense fallback={<PageLoader />}><GamesPage /></Suspense>} />
           <Route path="/about" element={<Suspense fallback={<PageLoader />}><AboutPage /></Suspense>} />
         </Route>

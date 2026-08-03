@@ -1,4 +1,4 @@
-import {
+﻿import {
   useCallback,
   useEffect,
   useMemo,
@@ -31,6 +31,7 @@ import { useSceneStore } from "../../stores/sceneStore";
 import { useSound } from "./useSound";
 import type { Project } from "../../api/types";
 import { DEFAULT_SITE_PERMISSIONS, isActionAllowed } from "./entryPermissions";
+import { actionIdForRoute, isSwitchModalRoute, routeForAction, type SwitchRouteState } from "./switchRoutes";
 import "./switch-ui.css";
 
 interface SwitchHomeScreenProps {
@@ -39,12 +40,15 @@ interface SwitchHomeScreenProps {
   presentation?: "preview" | "fullscreen";
   onRequestFocus: () => void;
   onRequestExit: () => void;
+  routeState?: SwitchRouteState;
+  onNavigate?: (to: string, options?: { replace?: boolean }) => void;
 }
 
 type FocusZone = "projects" | "actions";
 
 const MIN_PROJECT_SLOTS = 5;
 const HOME_PROJECT_LIMIT = 12;
+const HOME_SWITCH_ROUTE_STATE: SwitchRouteState = { kind: "home" };
 const GITHUB_HOME_URL = "https://github.com/meo-blog";
 
 function extractGithubUsername(url?: string): string | null {
@@ -90,10 +94,6 @@ function openExternal(url?: string) {
   window.open(url, "_blank", "noopener,noreferrer");
 }
 
-function goToRoute(route?: string) {
-  if (!route) return;
-  window.location.href = route;
-}
 
 function normalizeAdminGateKey(key: string): AdminGateKey | null {
   const normalized = key.toLowerCase();
@@ -115,8 +115,23 @@ export function SwitchHomeScreen({
   presentation = "preview",
   onRequestFocus,
   onRequestExit,
+  routeState = HOME_SWITCH_ROUTE_STATE,
+  onNavigate,
 }: SwitchHomeScreenProps) {
   const { play: playSound } = useSound();
+  const navigate = useCallback((to: string, options?: { replace?: boolean }) => {
+    if (onNavigate) {
+      onNavigate(to, options);
+      return;
+    }
+
+    if (options?.replace) {
+      window.history.replaceState(null, "", to);
+    } else {
+      window.history.pushState(null, "", to);
+    }
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  }, [onNavigate]);
   const playProjectHover = useCallback(() => playSound("project-hover"), [playSound]);
   const playProjectClick = useCallback(() => playSound("project-click"), [playSound]);
   const playActionHover = useCallback(() => playSound("action-hover"), [playSound]);
@@ -162,7 +177,7 @@ export function SwitchHomeScreen({
     return () => window.removeEventListener("session-expired", onSessionExpired);
   }, [setAdminAuthenticated]);
 
-  // Tier 1: load project summaries → preload icons → mark content ready
+  // Tier 1: load project summaries �?preload icons �?mark content ready
   // Profile loads independently (not blocking the overlay)
   useEffect(() => {
     let cancelled = false;
@@ -185,7 +200,7 @@ export function SwitchHomeScreen({
       setContentReady();
       warmProjectIcons(projects);
     }).catch(() => {
-      // API failed — don't block the overlay forever
+      // API failed �?don't block the overlay forever
       if (!cancelled) {
         setIconsReady();
         setContentReady();
@@ -272,6 +287,51 @@ export function SwitchHomeScreen({
   }, [permissionDenied]);
 
   useEffect(() => {
+    if (!isSwitchModalRoute(routeState.kind)) return;
+    if (!focused) onRequestFocus();
+  }, [focused, onRequestFocus, routeState.kind]);
+
+  useEffect(() => {
+    const actionId = actionIdForRoute(routeState.kind);
+    if (actionId && !isAdminAuthenticated && !isActionAllowed(actionId, permissions)) {
+      setPermissionDenied(false);
+      window.setTimeout(() => setPermissionDenied(true), 0);
+      navigate("/", { replace: true });
+      return;
+    }
+
+    setShowGithub(routeState.kind === "github");
+    setShowBlog(routeState.kind === "blog" || routeState.kind === "post");
+    setShowGuestbook(routeState.kind === "guestbook");
+    setShowResume(routeState.kind === "resume");
+    setShowFavorites(routeState.kind === "favorites");
+    setShowProjectLibrary(routeState.kind === "projects");
+
+    if (routeState.kind !== "project") {
+      setDetailProject(null);
+      setDetailLoading(false);
+    }
+    if (routeState.kind === "admin") {
+      void openAdminArea();
+    } else {
+      setAdminPanelOpen(false);
+    }
+  }, [isAdminAuthenticated, navigate, permissions, routeState.kind]);
+
+  useEffect(() => {
+    if (routeState.kind !== "project" || !routeState.projectId || !focused) return;
+    const project = allProjects.find((item) => item.id === routeState.projectId);
+    if (!project) return;
+    const currentId = detailProject && "id" in detailProject ? detailProject.id : "";
+    if (currentId === project.id && !detailLoading) return;
+    void openProjectDetail(project);
+  }, [allProjects, detailLoading, detailProject, focused, routeState.kind, routeState.projectId]);
+
+  function closeRouteModal() {
+    navigate("/");
+  }
+
+  useEffect(() => {
     setSelectedProject(0);
     setHoveredProject(-1);
     setProjectDragging(false);
@@ -293,7 +353,7 @@ export function SwitchHomeScreen({
       if (showGithub) {
         if (event.key === "Escape") {
           playSound("close");
-          setShowGithub(false);
+          closeRouteModal();
           return;
         }
         return;
@@ -302,7 +362,7 @@ export function SwitchHomeScreen({
       if (showBlog) {
         if (event.key === "Escape") {
           playSound("close");
-          setShowBlog(false);
+          closeRouteModal();
           return;
         }
         return;
@@ -311,7 +371,7 @@ export function SwitchHomeScreen({
       if (showGuestbook) {
         if (event.key === "Escape") {
           playSound("close");
-          setShowGuestbook(false);
+          closeRouteModal();
           return;
         }
         return;
@@ -320,7 +380,7 @@ export function SwitchHomeScreen({
       if (showResume) {
         if (event.key === "Escape") {
           playSound("close");
-          setShowResume(false);
+          closeRouteModal();
           return;
         }
         return;
@@ -329,7 +389,7 @@ export function SwitchHomeScreen({
       if (showFavorites) {
         if (event.key === "Escape") {
           playSound("close");
-          setShowFavorites(false);
+          closeRouteModal();
           return;
         }
         return;
@@ -338,7 +398,7 @@ export function SwitchHomeScreen({
       if (detailProject) {
         if (event.key === "Escape") {
           playSound("close");
-          setDetailProject(null);
+          closeRouteModal();
           return;
         }
         return;
@@ -347,7 +407,7 @@ export function SwitchHomeScreen({
       if (showProjectLibrary) {
         if (event.key === "Escape") {
           playSound("close");
-          setShowProjectLibrary(false);
+          closeRouteModal();
         }
         return;
       }
@@ -425,7 +485,7 @@ export function SwitchHomeScreen({
         event.preventDefault();
         if (focusZone === "projects") {
           if (selectedProject === moreProjectIndex) {
-            setShowProjectLibrary(true);
+            navigate("/projects");
           } else if (currentProject.icon !== "empty") {
             void openProjectDetail(currentProject);
           }
@@ -442,7 +502,7 @@ export function SwitchHomeScreen({
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [adminPromptOpen, currentAction?.id, currentProject, detailProject, focusZone, focused, moreProjectIndex, onRequestExit, playSound, projectNavigationCount, selectedProject, showBlog, showFavorites, showGithub, showGuestbook, showProjectLibrary, showResume, visibleActions.length]);
+  }, [adminPromptOpen, currentAction?.id, currentProject, detailProject, focusZone, focused, moreProjectIndex, navigate, onRequestExit, playSound, projectNavigationCount, selectedProject, showBlog, showFavorites, showGithub, showGuestbook, showProjectLibrary, showResume, visibleActions.length]);
 
   function resetAdminGate() {
     adminGateCodeRef.current = "";
@@ -511,7 +571,7 @@ export function SwitchHomeScreen({
 
     try {
       await api.login(password, adminGateCodeRef.current);
-      setAdminAuthMessage("身份确认，正在进入管理后台...");
+      setAdminAuthMessage("身份确认，正在进入管理后�?..");
       setAdminAuthenticated(true);
       setTimeout(() => {
         setAdminPromptOpen(false);
@@ -604,49 +664,16 @@ export function SwitchHomeScreen({
       return;
     }
 
-    if (actionId === "github-home") {
-      const ghUsername = extractGithubUsername(profile?.githubUrl);
-      if (ghUsername) {
-        setShowGithub(true);
-      } else {
-        openExternal(GITHUB_HOME_URL);
-      }
+    if (actionId === "github-home" && !extractGithubUsername(profile?.githubUrl)) {
+      openExternal(GITHUB_HOME_URL);
       return;
     }
 
-    if (actionId === "favorites") {
-      setShowFavorites(true);
-      return;
-    }
+    if (actionId === "admin" && sessionChecking) return;
 
-    if (actionId === "admin") {
-      if (sessionChecking) return;
-      void openAdminArea();
-      return;
-    }
-
-    if (actionId === "blog") {
-      setShowBlog(true);
-      return;
-    }
-
-    if (actionId === "contact") {
-      setShowGuestbook(true);
-      return;
-    }
-
-    if (actionId === "resume") {
-      setShowResume(true);
-      return;
-    }
-
-    const routes: Record<string, string> = {
-    };
-
-    if (routes[actionId]) {
-      goToRoute(routes[actionId]);
-    }
-  }, [focused, permissions, profile?.githubUrl, isAdminAuthenticated, sessionChecking, onRequestFocus, onRequestExit]);
+    const route = routeForAction(actionId);
+    if (route) navigate(route);
+  }, [focused, permissions, profile?.githubUrl, isAdminAuthenticated, sessionChecking, navigate, onRequestFocus, onRequestExit]);
 
   return (
     <section
@@ -674,7 +701,7 @@ export function SwitchHomeScreen({
               }
               const ghUsername = extractGithubUsername(profile?.githubUrl);
               if (ghUsername) {
-                setShowGithub(true);
+                navigate("/github");
               } else {
                 openExternal(GITHUB_HOME_URL);
               }
@@ -782,7 +809,7 @@ export function SwitchHomeScreen({
                 setHoveredProject(-1);
               }}
               onOpen={async () => {
-                await openProjectDetail(project);
+                navigate(`/projects/${project.id}`);
               }}
               onOpenRepo={() => openExternal(project.repoUrl)}
               onHoverSound={playProjectHover}
@@ -803,7 +830,7 @@ export function SwitchHomeScreen({
                 onRequestFocus();
                 return;
               }
-              setShowProjectLibrary(true);
+              navigate("/projects");
             }}
             onHoverSound={playProjectHover}
             onClickSound={playProjectClick}
@@ -848,7 +875,7 @@ export function SwitchHomeScreen({
               <span />
               <span />
               <strong>admin-auth.exe</strong>
-              <button type="button" aria-label="关闭认证窗口" onClick={closeAdminPrompt}>
+              <button type="button" aria-label="关闭认证窗口" onClick={() => { closeAdminPrompt(); closeRouteModal(); }}>
                 ×
               </button>
             </div>
@@ -914,7 +941,7 @@ export function SwitchHomeScreen({
                 </p>
               )}
               <div className="switch-terminal-actions">
-                <button type="button" onClick={closeAdminPrompt}>
+                <button type="button" onClick={() => { closeAdminPrompt(); closeRouteModal(); }}>
                   取消
                 </button>
                 <button type="submit" disabled={adminAuthStatus === "submitting"}>
@@ -954,7 +981,7 @@ export function SwitchHomeScreen({
       )}
 
       {adminPanelOpen && createPortal(
-        <AdminPanel onClose={() => { playSound("close"); setAdminPanelOpen(false); }} />,
+        <AdminPanel onClose={() => { playSound("close"); closeRouteModal(); }} />,
         document.body,
       )}
 
@@ -968,41 +995,46 @@ export function SwitchHomeScreen({
       {showProjectLibrary && (
         <ProjectLibrary
           projects={allProjects}
-          onClose={() => { playSound("close"); setShowProjectLibrary(false); }}
-          onOpenProject={(project) => { playProjectClick(); void openProjectDetail(project); }}
+          onClose={() => { playSound("close"); closeRouteModal(); }}
+          onOpenProject={(project) => { playProjectClick(); navigate(`/projects/${project.id}`); }}
         />
       )}
 
       {detailProject && createPortal(
-        <ProjectDetail project={detailProject} loading={detailLoading} onClose={() => { playSound("close"); setDetailProject(null); setDetailLoading(false); }} />,
+        <ProjectDetail project={detailProject} loading={detailLoading} onClose={() => { playSound("close"); closeRouteModal(); }} />,
         document.body,
       )}
 
       {showGithub && (() => {
         const ghUsername = extractGithubUsername(profile?.githubUrl);
         return ghUsername ? createPortal(
-          <GitHubProfile username={ghUsername} onClose={() => { playSound("close"); setShowGithub(false); }} />,
+          <GitHubProfile username={ghUsername} onClose={() => { playSound("close"); closeRouteModal(); }} />,
           document.body,
         ) : null;
       })()}
 
       {showBlog && createPortal(
-        <BlogBookshelf onClose={() => { playSound("close"); setShowBlog(false); }} />,
+        <BlogBookshelf
+          initialPostId={routeState.kind === "post" ? routeState.postId : undefined}
+          onOpenPost={(post) => navigate(`/posts/${post.id}`)}
+          onBackToBlog={() => navigate("/blog")}
+          onClose={() => { playSound("close"); closeRouteModal(); }}
+        />,
         document.body,
       )}
 
       {showGuestbook && createPortal(
-        <MessageWallModal onClose={() => { playSound("close"); setShowGuestbook(false); }} />,
+        <MessageWallModal onClose={() => { playSound("close"); closeRouteModal(); }} />,
         document.body,
       )}
 
       {showResume && createPortal(
-        <ResumeModal onClose={() => { playSound("close"); setShowResume(false); }} />,
+        <ResumeModal onClose={() => { playSound("close"); closeRouteModal(); }} />,
         document.body,
       )}
 
       {showFavorites && createPortal(
-        <FavoritesModal onClose={() => { playSound("close"); setShowFavorites(false); }} />,
+        <FavoritesModal onClose={() => { playSound("close"); closeRouteModal(); }} />,
         document.body,
       )}
     </section>

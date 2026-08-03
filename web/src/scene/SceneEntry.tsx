@@ -1,11 +1,13 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { useLocation, useNavigate } from "react-router-dom";
 import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 import { NightStage } from "./NightStage";
 import { SceneLoader } from "./SceneLoader";
 import { useSceneLayout } from "./useSceneLayout";
 import { LoadingOverlay } from "./LoadingOverlay";
+import { getSwitchRouteState, isSwitchModalRoute } from "../features/switch-ui/switchRoutes";
 
 const DESKTOP_FOV = 42;
 const MOBILE_FOV = 58;
@@ -92,9 +94,16 @@ function SceneCamera({
 }
 
 export function SceneEntry() {
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
+  const routeState = getSwitchRouteState(pathname);
   const { layout, error: layoutError } = useSceneLayout();
-  const [screenFocused, setScreenFocused] = useState(false);
+  const [screenFocused, setScreenFocused] = useState(() => isSwitchModalRoute(routeState.kind));
   const [screenResetSignal, setScreenResetSignal] = useState(0);
+
+  useEffect(() => {
+    if (isSwitchModalRoute(routeState.kind)) setScreenFocused(true);
+  }, [routeState.kind]);
   function openScreen() {
     setScreenFocused(true);
   }
@@ -152,6 +161,8 @@ export function SceneEntry() {
               onRequestScreenFocus={openScreen}
               onRequestScreenHome={resetScreenHome}
               onRequestScreenExit={closeScreen}
+              routeState={routeState}
+              onNavigate={navigate}
             />
           )}
         </Suspense>

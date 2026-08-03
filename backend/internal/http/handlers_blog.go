@@ -275,6 +275,30 @@ func adminListBlogPostsHandler(db *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
+func adminBlogCommentModerationHandler(db *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		queue, err := repository.GetBlogCommentModerationQueue(r.Context(), db)
+		if err != nil {
+			slog.Error("list blog comment moderation queue failed", "error", err)
+			RespondError(w, "LIST_FAILED", "failed to list comment moderation queue", http.StatusInternalServerError)
+			return
+		}
+		RespondOK(w, queue)
+	}
+}
+
+func adminPublishBlogCommentHandler(db *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+		comment, err := repository.PublishBlogComment(r.Context(), db, id)
+		if err != nil {
+			RespondError(w, "UPDATE_FAILED", "failed to publish comment", http.StatusInternalServerError)
+			return
+		}
+		RespondOK(w, comment)
+	}
+}
+
 func adminDeleteBlogCommentHandler(db *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")

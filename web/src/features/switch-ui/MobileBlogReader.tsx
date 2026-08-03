@@ -3,11 +3,15 @@ import remarkGfm from "remark-gfm";
 import { api } from "../../api/client";
 import type { BlogCategory, BlogPost } from "../../api/types";
 import { useAdminStore } from "../../stores/adminStore";
+import { BlogComments } from "./BlogComments";
 
 const Markdown = lazy(() => import("react-markdown"));
 
 interface MobileBlogReaderProps {
   onClose: () => void;
+  initialPostId?: string;
+  onOpenPost?: (post: BlogPost) => void;
+  onBackToBlog?: () => void;
 }
 
 type MobileBlogView = "categories" | "posts" | "reader";
@@ -25,8 +29,9 @@ function categoryInitial(name: string) {
   return Array.from(name.trim())[0] ?? "#";
 }
 
-export function MobileBlogReader({ onClose }: MobileBlogReaderProps) {
+export function MobileBlogReader({ onClose, initialPostId, onOpenPost, onBackToBlog }: MobileBlogReaderProps) {
   const profile = useAdminStore((state) => state.profile);
+  const isAdmin = useAdminStore((state) => state.authenticated);
   const [view, setView] = useState<MobileBlogView>("categories");
   const [categories, setCategories] = useState<BlogCategory[]>([]);
   const [posts, setPosts] = useState<BlogPost[]>([]);
@@ -45,7 +50,7 @@ export function MobileBlogReader({ onClose }: MobileBlogReaderProps) {
     let cancelled = false;
     setLoading(true);
     setError("");
-    Promise.all([api.getBlogCategoriesFresh(), api.getBlogPosts()])
+    Promise.all([api.getBlogCategoriesFresh(), api.getBlogPostsFresh()])
       .then(([cats, allPosts]) => {
         if (cancelled) return;
         const countMap: Record<string, number> = {};
@@ -54,7 +59,7 @@ export function MobileBlogReader({ onClose }: MobileBlogReaderProps) {
         }
         setCategories(cats.map((cat) => ({
           ...cat,
-          postCount: cat.postCount || countMap[cat.id] || 0,
+          postCount: countMap[cat.id] ?? cat.postCount ?? 0,
         })));
         setPosts(allPosts);
       })
@@ -68,6 +73,34 @@ export function MobileBlogReader({ onClose }: MobileBlogReaderProps) {
       cancelled = true;
     };
   }, [retrySignal]);
+
+  useEffect(() => {
+    if (!initialPostId) return;
+
+    let cancelled = false;
+    setReaderLoading(true);
+    setError("");
+    api.getBlogPost(initialPostId)
+      .then((post) => {
+        if (cancelled) return;
+        setSelectedPost(post);
+        setSelectedCategory((current) => current ?? categories.find((category) => category.id === post.categoryId) ?? null);
+        setView("reader");
+        setPosts((prev) => prev.some((item) => item.id === post.id)
+          ? prev.map((item) => (item.id === post.id ? post : item))
+          : [...prev, post]);
+      })
+      .catch(() => {
+        if (!cancelled) setError("文章内容加载失败");
+      })
+      .finally(() => {
+        if (!cancelled) setReaderLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [initialPostId, categories]);
 
   // Detect if category description overflows and reset expand when category changes
   useEffect(() => {
@@ -129,6 +162,7 @@ export function MobileBlogReader({ onClose }: MobileBlogReaderProps) {
   async function openPost(post: BlogPost) {
     setSelectedPost(post);
     setView("reader");
+    onOpenPost?.(post);
     if (post.contentMd) return;
 
     setReaderLoading(true);
@@ -146,7 +180,8 @@ export function MobileBlogReader({ onClose }: MobileBlogReaderProps) {
   function goBack() {
     setError("");
     if (view === "reader") {
-      setView("posts");
+      if (initialPostId) onBackToBlog?.();
+      setView(selectedCategory ? "posts" : "categories");
       setSelectedPost(null);
       return;
     }
@@ -305,6 +340,7 @@ export function MobileBlogReader({ onClose }: MobileBlogReaderProps) {
                   </Suspense>
                 </div>
               )}
+              {!readerLoading && <BlogComments postId={selectedPost.id} isAdmin={isAdmin} compact />}
             </article>
           )}
         </main>

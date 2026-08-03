@@ -194,7 +194,7 @@ Environment secrets：
 | `DEPLOY_SSH_KEY` | SSH 私钥 |
 | `DEPLOY_PORT` | SSH 端口，可选，默认 22 |
 
-服务器 ED25519 主机指纹固定在 `.github/workflows/deploy.yml` 中；服务器重装或 SSH 主机密钥轮换后，应先通过可信渠道核对新指纹，再更新工作流。
+部署客户端协商使用的服务器主机指纹固定在 `.github/workflows/deploy.yml` 中；服务器重装或 SSH 主机密钥轮换后，应先通过可信渠道核对新指纹，再更新工作流。
 
 Environment variable：
 

@@ -12,4 +12,5 @@ COPY model /usr/share/models
 RUN find /usr/share/nginx/html /usr/share/models -type f \( \
       -name "*.js" -o -name "*.css" -o -name "*.json" -o -name "*.svg" -o \
       -name "*.html" -o -name "*.wasm" \
-    \) -exec gzip -kf -9 {} \;
+    \) -exec gzip -kf -9 {} \; && \
+    chmod -R a+rX /usr/share/nginx/html /usr/share/models

@@ -205,7 +205,7 @@ Environment variable：
 ### 服务器准备
 
 1. 安装 Git、Docker Engine、Docker Compose 插件和 `flock`。
-2. 将仓库克隆到 `DEPLOY_PATH`，确保部署用户可运行 Docker。
+2. 创建 `DEPLOY_PATH` 并放置 `.env`；首次部署会自动初始化 Git 仓库并检出通过 CI 的提交，确保部署用户可运行 Docker。
 3. 复制 `.env.example` 为 `.env`，填写所有生产密码；不要提交 `.env`。
 4. 创建 `data/uploads`、`data/postgres`、`data/redis` 和 `data/backups`，并赋予正确权限。
 5. 配置 DNS、80/443 防火墙规则和 `/etc/letsencrypt/live/meowj.top/` 证书。

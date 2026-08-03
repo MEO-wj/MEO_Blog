@@ -38,6 +38,7 @@ jobs:
     env:
       DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
       DEPLOY_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.commit_sha }}
+      DEPLOY_REPOSITORY: https://github.com/${{ github.repository }}.git
     steps:
       - name: Validate deployment target
         shell: bash
@@ -55,7 +56,7 @@ jobs:
           port: ${{ secrets.DEPLOY_PORT || 22 }}
           fingerprint: SHA256:P+kidCipgKAzEdjZU4eB/vsqFDZOH/8r7O211Lvl+WQ
           command_timeout: 30m
-          envs: DEPLOY_PATH,DEPLOY_SHA
+          envs: DEPLOY_PATH,DEPLOY_SHA,DEPLOY_REPOSITORY
           script: |
             set -eu
             umask 077
@@ -80,16 +81,25 @@ jobs:
               exit 1
             fi
 
+            bootstrap_repository=0
+            if ! git rev-parse --git-dir >/dev/null 2>&1; then
+              echo "Initializing deployment repository in $DEPLOY_PATH"
+              git init
+              git remote add origin "$DEPLOY_REPOSITORY"
+              bootstrap_repository=1
+            fi
+
             git fetch origin main --prune
             git cat-file -e "${DEPLOY_SHA}^{commit}"
             git merge-base --is-ancestor "$DEPLOY_SHA" origin/main
 
-            if ! git diff --quiet || ! git diff --cached --quiet; then
+            if [ "$bootstrap_repository" -eq 0 ] && \
+               { ! git diff --quiet || ! git diff --cached --quiet; }; then
               echo "Deployment worktree has tracked changes; refusing to overwrite them" >&2
               exit 1
             fi
 
-            git checkout --detach "$DEPLOY_SHA"
+            git checkout --force --detach "$DEPLOY_SHA"
 
             mkdir -p data/backups
             if docker compose -f docker-compose.server.yml ps --status running --services | grep -qx postgres; then

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { api } from "../../api/client";
+import { setSiteFavicon } from "../../app/favicon";
 import { saveQueue } from "../../api/saveQueue";
 import type { AdminProfile, Partner, Project, ProjectCreate, ProjectSummary, ProjectUpdate, SitePermissions } from "../../api/types";
 import { useAdminStore } from "../../stores/adminStore";
@@ -219,6 +220,7 @@ function ProfileEditor({ onSave }: { onSave: (p: AdminProfile) => void }) {
     if (!file || !profile) return;
     try {
       const { url } = await api.uploadAvatar(file);
+      setSiteFavicon(url);
       const updated = { ...profile, avatarUrl: url };
       setProfile(updated);
       onSave(updated);

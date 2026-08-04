@@ -1,6 +1,8 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
+import { api } from "./api/client";
+import { setSiteFavicon } from "./app/favicon";
 import "./styles/global.css";
 
 const CHUNK_RELOAD_KEY = "meo-blog:chunk-reload-at";
@@ -38,6 +40,12 @@ window.addEventListener("unhandledrejection", (event) => {
   event.preventDefault();
   reloadForFreshAssets();
 });
+
+void api.getPublicProfile(true)
+  .then((profile) => setSiteFavicon(profile.avatarUrl))
+  .catch(() => {
+    // Keep the HTML fallback favicon when the public profile is unavailable.
+  });
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

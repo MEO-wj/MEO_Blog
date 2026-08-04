@@ -307,7 +307,7 @@ export const api = {
   },
 
   // Profile
-  getPublicProfile: () => request<AdminProfile>("/profile", undefined, 2, 10 * 60 * 1000),
+  getPublicProfile: (fresh = false) => request<AdminProfile>("/profile", undefined, 2, fresh ? 0 : 10 * 60 * 1000),
   getProfile: () => request<AdminProfile>("/admin/profile", undefined, 2, 5 * 60 * 1000),
   updateProfile: async (data: ProfileUpdate) => {
     const result = await request<AdminProfile>("/admin/profile", {

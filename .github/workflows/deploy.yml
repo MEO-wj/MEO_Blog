@@ -38,7 +38,6 @@ jobs:
     env:
       DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
       DEPLOY_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.commit_sha }}
-      DEPLOY_REPOSITORY: https://github.com/${{ github.repository }}.git
     steps:
       - name: Validate deployment target
         shell: bash
@@ -46,6 +45,32 @@ jobs:
           set -euo pipefail
           test -n "$DEPLOY_PATH"
           test -n "$DEPLOY_SHA"
+
+      - name: Checkout verified commit
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
+          fetch-depth: 0
+
+      - name: Verify selected commit
+        shell: bash
+        run: git merge-base --is-ancestor "$DEPLOY_SHA" origin/main
+
+      - name: Package verified release
+        shell: bash
+        run: git archive --format=tar.gz --output="release-${DEPLOY_SHA}.tar.gz" "$DEPLOY_SHA"
+
+      - name: Upload verified release
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT || 22 }}
+          fingerprint: SHA256:P+kidCipgKAzEdjZU4eB/vsqFDZOH/8r7O211Lvl+WQ
+          source: release-${{ env.DEPLOY_SHA }}.tar.gz
+          target: ${{ env.DEPLOY_PATH }}
+          command_timeout: 10m
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.2.5
@@ -56,14 +81,14 @@ jobs:
           port: ${{ secrets.DEPLOY_PORT || 22 }}
           fingerprint: SHA256:P+kidCipgKAzEdjZU4eB/vsqFDZOH/8r7O211Lvl+WQ
           command_timeout: 30m
-          envs: DEPLOY_PATH,DEPLOY_SHA,DEPLOY_REPOSITORY
+          envs: DEPLOY_PATH,DEPLOY_SHA
           script: |
             set -eu
             umask 077
 
             command -v docker >/dev/null
-            command -v git >/dev/null
             command -v flock >/dev/null
+            command -v tar >/dev/null
 
             cd "$DEPLOY_PATH"
             test -f .env
@@ -81,25 +106,13 @@ jobs:
               exit 1
             fi
 
-            bootstrap_repository=0
-            if ! git rev-parse --git-dir >/dev/null 2>&1; then
-              echo "Initializing deployment repository in $DEPLOY_PATH"
-              git init
-              git remote add origin "$DEPLOY_REPOSITORY"
-              bootstrap_repository=1
-            fi
-
-            git fetch origin main --prune
-            git cat-file -e "${DEPLOY_SHA}^{commit}"
-            git merge-base --is-ancestor "$DEPLOY_SHA" origin/main
-
-            if [ "$bootstrap_repository" -eq 0 ] && \
-               { ! git diff --quiet || ! git diff --cached --quiet; }; then
-              echo "Deployment worktree has tracked changes; refusing to overwrite them" >&2
-              exit 1
-            fi
-
-            git checkout --force --detach "$DEPLOY_SHA"
+            release_archive="$DEPLOY_PATH/release-${DEPLOY_SHA}.tar.gz"
+            test -f "$release_archive"
+            tar -tzf "$release_archive" >/dev/null
+            umask 022
+            tar -xzf "$release_archive" -C "$DEPLOY_PATH" --overwrite
+            rm -f "$release_archive"
+            test -f docker-compose.server.yml
 
             mkdir -p data/backups
             if docker compose -f docker-compose.server.yml ps --status running --services | grep -qx postgres; then

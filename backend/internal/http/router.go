@@ -58,6 +58,9 @@ func NewRouter(cfg *config.Config, db *pgxpool.Pool, rdb *redis.Client) http.Han
 			r.Get("/admin/profile", getProfileHandler(db))
 			r.Put("/admin/profile", updateProfileHandler(db))
 			r.Post("/admin/avatar", uploadAvatarHandler(db, cfg))
+			r.Get("/admin/backup", adminDownloadBackupHandler(cfg))
+			r.Post("/admin/backup/restore", adminRestoreBackupHandler(cfg, db))
+
 			r.Post("/admin/resume", uploadResumeHandler(db, cfg))
 
 			r.Post("/admin/favorites", adminCreateFavoriteHandler(db, cfg))

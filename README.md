@@ -161,6 +161,7 @@ MEO_Blog/
 ├── docs/                           # 设计文档、架构文档
 ├── docker-compose.yml              # 全栈部署编排
 ├── docker-compose.server.yml       # 服务器部署（含 Certbot）
+├── docker-compose.local-server.yml # Local server/NAS deployment (:18080)
 └── .env.example                    # 环境变量模板
 ```
 
@@ -189,14 +190,16 @@ go run ./cmd/server
 ```bash
 cp .env.example .env
 # 编辑 .env 填入密码等配置
-docker compose up -d --build
-# → http://localhost/
+docker compose -f docker-compose.local-server.yml up -d --build
+# → http://localhost:18080/
 ```
 
 ## 部署
 
 ```bash
 # 服务器部署（含 HTTPS）
+docker compose up -d --build
+# Equivalent explicit cloud configuration:
 docker compose -f docker-compose.server.yml up -d --build
 ```
 
@@ -210,9 +213,21 @@ nginx (:80/:443) → 前端静态文件
 backend:8080 → postgres:5432
              → redis:6379
 
-postgres:5432 → E:/MEO_Blog_Data/postgres (持久化)
-redis:6379    → E:/MEO_Blog_Data/redis (持久化)
+postgres:5432 → ./data/postgres (持久化)
+redis:6379    → ./data/redis (持久化)
 ```
+
+## 管理后台备份与恢复
+
+管理员可以在“数据备份”页面：
+
+- 下载包含 `database.dump`、`manifest.json` 和 `uploads/` 的完整 `.tar.gz` 备份。
+- 直接上传原始 `.tar.gz` 恢复，无需解压。
+- 选择已经解压的备份文件夹恢复。
+
+恢复会在校验备份格式后，以单事务替换当前 PostgreSQL 数据库；数据库失败时自动回滚。备份中的上传文件会覆盖同名文件，但不会删除目标部署中的其他文件。恢复完成后页面会自动刷新。
+
+> 恢复属于覆盖操作。执行前建议先从目标博客下载一份当前备份。
 
 ## 文档索引
 

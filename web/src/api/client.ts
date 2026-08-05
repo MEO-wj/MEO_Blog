@@ -2,6 +2,182 @@ import type { APIResponse, AdminProfile, ProfileUpdate, SitePermissions, Project
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? "/api/v1";
 const GET_TIMEOUT_MS = 12000;
+export async function downloadAdminBackup(): Promise<string> {
+  let response: Response;
+  try {
+    response = await fetch(`${BASE_URL}/admin/backup`, {
+      method: "GET",
+      credentials: "include",
+      headers: { Accept: "application/gzip" },
+    });
+  } catch {
+    throw new Error("无法连接备份接口，请检查云服务器和反向代理");
+  }
+
+  if (!response.ok) {
+    let message = response.status === 404
+      ? "云服务器尚未部署备份接口，请重新构建后端和 Nginx"
+      : `备份请求失败（HTTP ${response.status}）`;
+    try {
+      const payload = await response.json() as APIResponse<never>;
+      const errorMessages: Record<string, string> = {
+        PG_DUMP_UNAVAILABLE: "服务器缺少 pg_dump，请重新构建后端镜像",
+        DATABASE_BACKUP_TIMEOUT: "数据库导出超时，请稍后重试",
+        DATABASE_BACKUP_FAILED: "数据库导出失败，请检查后端日志",
+        BACKUP_IN_PROGRESS: "已有备份正在生成，请稍后再试",
+        BACKUP_ARCHIVE_FAILED: "备份文件打包失败，请检查服务器磁盘空间和上传目录",
+      };
+      if (payload.error?.code && errorMessages[payload.error.code]) {
+        message = errorMessages[payload.error.code];
+      } else if (payload.error?.message) {
+        message = payload.error.message;
+      }
+    } catch {
+      // Preserve the HTTP status fallback for non-JSON proxy errors.
+    }
+
+    if (response.status === 401) {
+      invalidateCache("GET:/admin/session");
+      window.dispatchEvent(new CustomEvent("session-expired"));
+      message = "管理员登录已过期，请重新登录";
+    }
+    throw new Error(message);
+  }
+
+  const blob = await response.blob();
+  if (blob.size === 0) {
+    throw new Error("服务器返回了空备份文件");
+  }
+
+  const disposition = response.headers.get("Content-Disposition") ?? "";
+  const match = /filename="?([^";]+)"?/i.exec(disposition);
+  const filename = match?.[1] ?? `meo-blog-backup-${new Date().toISOString().replace(/[:.]/g, "-")}.tar.gz`;
+  const objectUrl = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = objectUrl;
+  anchor.download = filename;
+  anchor.style.display = "none";
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+  return filename;
+}
+
+export interface AdminRestoreResult {
+  restored: boolean;
+  createdAt: string;
+  uploadedFiles: number;
+}
+
+export async function restoreAdminBackupArchive(file: File): Promise<AdminRestoreResult> {
+  const form = new FormData();
+  form.append("archive", file, file.name);
+  return uploadAdminRestore(form);
+}
+
+export async function restoreAdminBackupFolder(files: File[]): Promise<AdminRestoreResult> {
+  const entries = files.map((file) => ({
+    file,
+    path: normalizeSelectedBackupPath(file.webkitRelativePath || file.name),
+  }));
+  const manifestEntry = entries.find(({ path }) => path.endsWith("/manifest.json") || path === "manifest.json");
+  if (!manifestEntry) {
+    throw new Error("所选文件夹中没有 manifest.json");
+  }
+
+  const root = manifestEntry.path.slice(0, -"manifest.json".length);
+  const databasePath = root + "database.dump";
+  const uploadsPrefix = root + "uploads/";
+  const databaseEntry = entries.find(({ path }) => path === databasePath);
+  if (!databaseEntry) {
+    throw new Error("所选文件夹中没有 database.dump");
+  }
+
+  const form = new FormData();
+  form.append("manifest", manifestEntry.file, "manifest.json");
+  form.append("database", databaseEntry.file, "database.dump");
+  for (const entry of entries) {
+    if (!entry.path.startsWith(uploadsPrefix)) continue;
+    const relative = entry.path.slice(uploadsPrefix.length);
+    if (!relative) continue;
+    form.append("upload:" + relative, entry.file, entry.file.name);
+  }
+  return uploadAdminRestore(form);
+}
+
+function normalizeSelectedBackupPath(input: string): string {
+  const normalized = input.replace(/\\/g, "/");
+  const segments = normalized.split("/");
+  if (segments.some((segment) => !segment || segment === "." || segment === "..")) {
+    throw new Error("备份文件夹包含无效路径");
+  }
+  return segments.join("/");
+}
+
+async function uploadAdminRestore(form: FormData): Promise<AdminRestoreResult> {
+  let response: Response;
+  try {
+    response = await fetch(`${BASE_URL}/admin/backup/restore`, {
+      method: "POST",
+      credentials: "include",
+      body: form,
+    });
+  } catch {
+    throw new Error("无法连接恢复接口，请检查服务器和反向代理");
+  }
+
+  let payload: APIResponse<AdminRestoreResult> | null = null;
+  try {
+    payload = await response.json() as APIResponse<AdminRestoreResult>;
+  } catch {
+    // Nginx and network errors may not return the API response envelope.
+  }
+
+  if (!response.ok) {
+    const messages: Record<string, string> = {
+      BACKUP_OPERATION_IN_PROGRESS: "已有备份或恢复任务正在进行，请稍后再试",
+      BACKUP_TOO_LARGE: "备份文件超过服务器允许的大小",
+      INVALID_BACKUP: "备份包格式无效或内容不完整",
+      INVALID_DATABASE_DUMP: "database.dump 不是有效的 PostgreSQL 备份",
+      PG_RESTORE_UNAVAILABLE: "服务器缺少 pg_restore，请重新构建后端镜像",
+      DATABASE_RESTORE_TIMEOUT: "数据库恢复超时",
+      DATABASE_RESTORE_FAILED: "数据库恢复失败，原数据库已自动回滚",
+      UPLOAD_RESTORE_FAILED: "数据库已恢复，但部分上传文件恢复失败，请检查后端日志",
+      RESTORE_VERIFY_FAILED: "恢复完成，但数据库健康检查失败",
+    };
+    let message = response.status === 404
+      ? "服务器尚未部署恢复接口，请重新构建后端和 Nginx"
+      : `恢复请求失败（HTTP ${response.status}）`;
+    if (payload?.error?.code && messages[payload.error.code]) {
+      message = messages[payload.error.code];
+    } else if (payload?.error?.message) {
+      message = payload.error.message;
+    }
+    if (response.status === 401) {
+      invalidateCache("GET:/admin/session");
+      window.dispatchEvent(new CustomEvent("session-expired"));
+      message = "管理员登录已过期，请重新登录";
+    }
+    throw new Error(message);
+  }
+
+  if (!payload?.data?.restored) {
+    throw new Error("服务器没有确认恢复成功");
+  }
+  clearClientDataCaches();
+  return payload.data;
+}
+
+function clearClientDataCaches(): void {
+  const keys: string[] = [];
+  for (let index = 0; index < localStorage.length; index++) {
+    const key = localStorage.key(index);
+    if (key?.startsWith("cache:")) keys.push(key);
+  }
+  keys.forEach((key) => localStorage.removeItem(key));
+}
+
 const MUTATION_TIMEOUT_MS = 30000;
 const UPLOAD_TIMEOUT_MS = 120000;
 const PROJECT_SUMMARIES_PATH = "/projects/summary?compact=1";

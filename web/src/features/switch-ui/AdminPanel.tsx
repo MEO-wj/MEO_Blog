@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { api } from "../../api/client";
+import { api, downloadAdminBackup, restoreAdminBackupArchive, restoreAdminBackupFolder } from "../../api/client";
 import { setSiteFavicon } from "../../app/favicon";
 import { saveQueue } from "../../api/saveQueue";
 import type { AdminProfile, Partner, Project, ProjectCreate, ProjectSummary, ProjectUpdate, SitePermissions } from "../../api/types";
@@ -19,8 +19,10 @@ const ACCENT_COLORS = [
 const MAX_PROJECTS = 100;
 const MAX_PROJECT_MARKDOWN_SIZE = 2 * 1024 * 1024;
 
+type AdminTab = "profile" | "projects" | "partners" | "comments" | "permissions" | "backup";
+
 export function AdminPanel({ onClose }: AdminPanelProps) {
-  const [tab, setTab] = useState<"profile" | "projects" | "partners" | "comments" | "permissions">("profile");
+  const [tab, setTab] = useState<AdminTab>("profile");
   const { setProfile, setProjectSummaries, setPartners, logout } = useAdminStore();
   const scrollRef = useWheelScroll<HTMLDivElement>();
   const [pendingBlogComments, setPendingBlogComments] = useState(0);
@@ -91,6 +93,12 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
           >
             权限面板
           </button>
+          <button
+            className={tab === "backup" ? "active" : ""}
+            onClick={() => setTab("backup")}
+          >
+            {"\u6570\u636e\u5907\u4efd"}
+          </button>
         </div>
         <div ref={scrollRef} className="admin-panel-body">
           {tab === "profile" && (
@@ -108,10 +116,196 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
           {tab === "permissions" && (
             <PermissionManager />
           )}
+          {tab === "backup" && (
+            <BackupManager />
+          )}
         </div>
       </div>
     </aside>
   );
+}
+
+function BackupManager() {
+  const folderInputRef = useRef<HTMLInputElement>(null);
+  const [downloading, setDownloading] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+  const [archiveFile, setArchiveFile] = useState<File | null>(null);
+  const [folderFiles, setFolderFiles] = useState<File[]>([]);
+  const [restoreMode, setRestoreMode] = useState<"archive" | "folder" | null>(null);
+  const [message, setMessage] = useState("");
+  const [messageType, setMessageType] = useState<"success" | "error">("success");
+
+  useEffect(() => {
+    folderInputRef.current?.setAttribute("webkitdirectory", "");
+    folderInputRef.current?.setAttribute("directory", "");
+  }, []);
+
+  async function handleDownload() {
+    setDownloading(true);
+    setMessage("");
+    try {
+      const filename = await downloadAdminBackup();
+      setMessageType("success");
+      setMessage("备份已下载：" + filename);
+    } catch (error) {
+      setMessageType("error");
+      setMessage(error instanceof Error ? error.message : "下载失败");
+    } finally {
+      setDownloading(false);
+    }
+  }
+
+  function selectArchive(file: File | undefined) {
+    if (!file) return;
+    setArchiveFile(file);
+    setFolderFiles([]);
+    setRestoreMode("archive");
+    setMessage("");
+  }
+
+  function selectFolder(files: FileList | null) {
+    const selected = files ? Array.from(files) : [];
+    if (selected.length === 0) return;
+    setFolderFiles(selected);
+    setArchiveFile(null);
+    setRestoreMode("folder");
+    setMessage("");
+  }
+
+  async function handleRestore() {
+    if (!restoreMode || (restoreMode === "archive" && !archiveFile) || (restoreMode === "folder" && folderFiles.length === 0)) {
+      setMessageType("error");
+      setMessage("请先选择备份压缩包或解压后的备份文件夹");
+      return;
+    }
+    const confirmed = window.confirm(
+      "恢复会覆盖当前博客数据库，并用备份中的同名文件覆盖上传目录。\n\n确定继续恢复吗？",
+    );
+    if (!confirmed) return;
+
+    setRestoring(true);
+    setMessage("");
+    try {
+      const result = restoreMode === "archive"
+        ? await restoreAdminBackupArchive(archiveFile!)
+        : await restoreAdminBackupFolder(folderFiles);
+      setMessageType("success");
+      setMessage(`恢复成功：已导入 ${result.uploadedFiles} 个上传文件，页面即将刷新。`);
+      window.setTimeout(() => window.location.reload(), 1800);
+    } catch (error) {
+      setMessageType("error");
+      setMessage(error instanceof Error ? error.message : "恢复失败");
+    } finally {
+      setRestoring(false);
+    }
+  }
+
+  const selectedSummary = restoreMode === "archive" && archiveFile
+    ? `${archiveFile.name}（${formatBackupSize(archiveFile.size)}）`
+    : restoreMode === "folder" && folderFiles.length > 0
+      ? `已选择解压文件夹：${folderFiles.length} 个文件，合计 ${formatBackupSize(folderFiles.reduce((sum, file) => sum + file.size, 0))}`
+      : "";
+
+  return (
+    <div className="admin-backup-panel">
+      <div className="admin-backup-card">
+        <div className="admin-backup-icon" aria-hidden="true">DB</div>
+        <div className="admin-backup-copy">
+          <h3>数据备份与迁移</h3>
+          <p>下载一个可移植的完整备份包，用于迁移或灾难恢复。</p>
+          <ul>
+            <li>PostgreSQL 数据库（标准 pg_dump 自定义格式）</li>
+            <li>上传的图片、头像、简历和项目文件</li>
+            <li>manifest.json 备份清单</li>
+          </ul>
+        </div>
+      </div>
+
+      <div className="admin-backup-warning">
+        <strong>安全提示</strong>
+        <span>备份包含管理员资料、文章和留言等敏感数据，请妥善保管。</span>
+      </div>
+      <button
+        type="button"
+        className="admin-backup-download"
+        onClick={handleDownload}
+        disabled={downloading || restoring}
+      >
+        {downloading ? "正在生成并下载备份..." : "下载完整数据备份"}
+      </button>
+      <p className="admin-backup-note">
+        点击后服务器会临时生成备份；数据较多时，下载可能需要等待。
+      </p>
+
+      <div className="admin-backup-divider" />
+
+      <section className="admin-restore-panel">
+        <div>
+          <h3>恢复已有备份</h3>
+          <p>推荐直接选择下载的 .tar.gz，无需解压；也可以选择已解压且包含 database.dump、manifest.json 和 uploads 的文件夹。</p>
+        </div>
+
+        <div className="admin-restore-choices">
+          <label className={restoreMode === "archive" ? "admin-restore-choice is-selected" : "admin-restore-choice"}>
+            <input
+              type="file"
+              accept=".tar.gz,.tgz,application/gzip"
+              onClick={(event) => { event.currentTarget.value = ""; }}
+              onChange={(event) => selectArchive(event.currentTarget.files?.[0])}
+              disabled={restoring}
+            />
+            <strong>选择原始备份包</strong>
+            <span>.tar.gz，推荐方式</span>
+          </label>
+
+          <label className={restoreMode === "folder" ? "admin-restore-choice is-selected" : "admin-restore-choice"}>
+            <input
+              ref={folderInputRef}
+              type="file"
+              multiple
+              onClick={(event) => { event.currentTarget.value = ""; }}
+              onChange={(event) => selectFolder(event.currentTarget.files)}
+              disabled={restoring}
+            />
+            <strong>选择解压后的文件夹</strong>
+            <span>自动识别 database.dump 与 uploads</span>
+          </label>
+        </div>
+
+        {selectedSummary && <p className="admin-restore-selection">{selectedSummary}</p>}
+
+        <div className="admin-restore-danger">
+          <strong>恢复属于覆盖操作</strong>
+          <span>当前数据库将被备份中的数据库替换；上传目录中的同名文件会被覆盖，其他文件保留。</span>
+        </div>
+
+        <button
+          type="button"
+          className="admin-backup-restore"
+          onClick={handleRestore}
+          disabled={restoring || downloading || !restoreMode}
+        >
+          {restoring ? "正在上传并恢复，请勿关闭页面..." : "导入并恢复备份"}
+        </button>
+      </section>
+
+      {message && (
+        <p
+          className={`admin-backup-message ${messageType === "error" ? "is-error" : "is-success"}`}
+          role="status"
+        >
+          {message}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function formatBackupSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
 const PERMISSION_ITEMS: Array<{ key: keyof SitePermissions; title: string; description: string }> = [

@@ -102,8 +102,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Validate server compose file
-        run: docker compose -f docker-compose.server.yml config --quiet
+      - name: Validate compose files
+        run: |
+          docker compose -f docker-compose.yml config --quiet
+          docker compose -f docker-compose.server.yml config --quiet
+          docker compose -f docker-compose.local-server.yml config --quiet
 
       - name: Build production images
         run: docker compose -f docker-compose.server.yml build nginx backend

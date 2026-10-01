@@ -8314,37 +8314,90 @@
   }
 }
 
-@media (max-width: 600px) {
-  /* GitHub Profile */
+@media (max-width: 760px) {
+  /* Keep the original centered profile; reserve more height for repositories. */
   .gh-profile-card {
     border-radius: 10px;
+    height: 94dvh;
+    max-height: calc(100dvh - 24px);
   }
   .gh-profile-header {
     flex-direction: column;
     align-items: center;
+    flex-shrink: 0;
     text-align: center;
-    padding: 20px 16px;
+    gap: 8px;
+    padding: 14px 16px 12px;
   }
   .gh-profile-header-left {
     flex-direction: column;
     align-items: center;
+    gap: 8px;
+    width: 100%;
+    flex: none;
   }
-  .gh-profile-header-right {
-    margin-left: 0;
+  .gh-profile-info {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+  }
+  .gh-profile-name {
+    overflow-wrap: anywhere;
+  }
+  .gh-profile-bio,
+  .gh-profile-meta,
+  .gh-profile-link-btn {
+    margin: 0;
+  }
+  .gh-profile-bio {
+    overflow-wrap: anywhere;
   }
   .gh-profile-meta {
+    width: 100%;
+    justify-content: center;
+    gap: 6px 28px;
+  }
+  .gh-profile-meta-item {
+    min-width: 0;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+  }
+  .gh-profile-meta-item:last-child {
+    flex-basis: 100%;
     justify-content: center;
   }
   .gh-profile-link-btn {
-    margin: 12px auto 0;
+    margin-top: 2px;
+  }
+  .gh-profile-header-right {
+    margin-left: 0;
+    padding-top: 0;
+  }
+  .gh-profile-contrib {
+    width: fit-content;
+    margin-inline: auto;
+  }
+  .gh-profile-contrib-grid {
+    margin-inline: auto;
   }
   .gh-profile-section {
-    padding: 16px;
+    padding: 10px 16px 12px;
+    min-height: min(180px, 35dvh);
   }
   .gh-profile-section-title {
+    margin-bottom: 10px;
     font-size: 14px;
   }
+  .gh-profile-repos-grid {
+    max-height: none;
+    align-content: start;
+    overscroll-behavior-y: contain;
+  }
+}
 
+@media (max-width: 600px) {
   /* Project Detail */
   .project-detail-backdrop {
     padding: 12px;

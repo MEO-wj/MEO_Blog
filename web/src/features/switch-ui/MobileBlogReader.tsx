@@ -1,11 +1,10 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import remarkGfm from "remark-gfm";
 import { api } from "../../api/client";
 import type { BlogCategory, BlogPost } from "../../api/types";
 import { useAdminStore } from "../../stores/adminStore";
 import { BlogComments } from "./BlogComments";
 
-const Markdown = lazy(() => import("react-markdown"));
+const Markdown = lazy(() => import("./MarkdownContent"));
 
 interface MobileBlogReaderProps {
   onClose: () => void;
@@ -336,7 +335,7 @@ export function MobileBlogReader({ onClose, initialPostId, onOpenPost, onBackToB
               ) : (
                 <div className="mobile-blog-markdown">
                   <Suspense fallback={<div className="mobile-blog-empty">渲染中...</div>}>
-                    <Markdown remarkPlugins={[remarkGfm]}>{selectedPost.contentMd || selectedPost.summary}</Markdown>
+                    <Markdown>{selectedPost.contentMd || selectedPost.summary}</Markdown>
                   </Suspense>
                 </div>
               )}

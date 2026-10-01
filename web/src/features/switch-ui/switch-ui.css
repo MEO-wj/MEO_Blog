@@ -5072,6 +5072,40 @@
   padding: 0;
   color: rgba(230, 220, 200, 0.85);
 }
+.markdown-diagram {
+  max-width: 100%;
+  margin: 1em 0;
+  padding: 16px;
+  overflow-x: auto;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: #171b22;
+  color: #c9d1d9;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.markdown-diagram:focus-visible {
+  outline: 2px solid #58a6ff;
+  outline-offset: 2px;
+}
+.markdown-diagram-svg {
+  margin: 0 auto;
+}
+.markdown-diagram-svg > svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.blog-markdown .markdown-diagram .markdown-diagram-svg p,
+.mobile-blog-markdown .markdown-diagram .markdown-diagram-svg p {
+  margin: 0;
+  color: inherit;
+  font-size: inherit;
+  line-height: inherit;
+}
+.markdown-diagram-error {
+  font-size: 14px;
+}
 .blog-markdown blockquote {
   border-left: 3px solid rgba(200, 180, 120, 0.3);
   padding-left: 16px;

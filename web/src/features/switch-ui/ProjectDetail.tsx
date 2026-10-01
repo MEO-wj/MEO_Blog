@@ -1,7 +1,6 @@
 import { lazy, Suspense, type CSSProperties } from "react";
-import remarkGfm from "remark-gfm";
 
-const Markdown = lazy(() => import("react-markdown"));
+const Markdown = lazy(() => import("./MarkdownContent"));
 import type { Project } from "../../api/types";
 import type { SwitchHomeProject } from "./switchHomeData";
 import { useWheelScroll } from "./useWheelScroll";
@@ -101,7 +100,7 @@ export function ProjectDetail({ project, loading, onClose }: ProjectDetailProps)
                 ) : (
                   <div className="project-detail-desc blog-markdown">
                     <Suspense fallback={<div style={{color:"#8a9bbd",padding:20}}>加载中...</div>}>
-                      <Markdown remarkPlugins={[remarkGfm]}>{description}</Markdown>
+                      <Markdown>{description}</Markdown>
                     </Suspense>
                   </div>
                 )}

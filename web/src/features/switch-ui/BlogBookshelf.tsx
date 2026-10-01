@@ -1,7 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
-import remarkGfm from "remark-gfm";
 
-const Markdown = lazy(() => import("react-markdown"));
+const Markdown = lazy(() => import("./MarkdownContent"));
 import { api } from "../../api/client";
 import { saveQueue } from "../../api/saveQueue";
 import type { BlogCategory, BlogCategoryCreate, BlogPost, BlogPostCreate } from "../../api/types";
@@ -626,7 +625,7 @@ function ReaderView({
           </div>
           <div className="blog-markdown">
             <Suspense fallback={<div style={{color:"#8a9bbd",padding:20}}>加载中...</div>}>
-              <Markdown remarkPlugins={[remarkGfm]}>{fullPost.contentMd}</Markdown>
+              <Markdown>{fullPost.contentMd}</Markdown>
             </Suspense>
           </div>
         </div>

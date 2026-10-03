@@ -67,7 +67,7 @@
 ### 博客系统（魔法书架）
 - 书架视图：分类以书本形式展示，每本书有自定义图标和颜色
 - 卷轴视图：文章以羊皮纸卷轴样式呈现
-- 阅读器：羊皮纸风格内容区，支持 GFM Markdown（表格、任务列表、删除线等）
+- 阅读器：羊皮纸风格内容区，支持 GFM Markdown（表格、任务列表、删除线等）及 Mermaid 图表
 - 评论系统：昵称 + 邮箱 + 内容，管理员可删除
 - 管理功能：分类和文章 CRUD，草稿/发布状态切换
 
@@ -85,7 +85,7 @@
 
 ### 项目展示
 - 项目卡片：图标、标题、副标题、分类标签、主题色
-- 详情弹窗：Markdown 简介 + 技术栈图标 + 状态徽章
+- 详情弹窗：Markdown 简介（含 Mermaid 流程图）+ 技术栈图标 + 状态徽章
 - 按需加载：首页仅加载摘要，点击后懒加载完整详情
 
 ### GitHub 集成
@@ -121,7 +121,7 @@
 | **状态管理** | Zustand |
 | **路由** | React Router v7 |
 | **样式** | Tailwind CSS v4 |
-| **Markdown** | react-markdown + remark-gfm |
+| **Markdown** | react-markdown + remark-gfm + Mermaid（图表按需加载） |
 | **后端语言** | Go |
 | **HTTP 框架** | Chi |
 | **数据库** | PostgreSQL 16 |

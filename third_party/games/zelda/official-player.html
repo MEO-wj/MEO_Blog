@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en-us">
+
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, user-scalable=no">
+  <link rel="preload" href="https://data.zquestclassic.com/manifest.json" fetchpriority="high" as="fetch" type="application/json" crossorigin="anonymous">
+  <link rel="preconnect" href="https://data.zquestclassic.com">
+  <link rel="preload" href="../zplayer.wasm" as="fetch" crossorigin="anonymous">
+  <title>ZQuest Classic</title>
+  <meta name="description" content="Play one of hundreds of quests in ZQuest Classic, or create your own! ZQuest Classic is a game engine where you can make your classic adventure game">
+  <style>
+    body {
+  margin: 0;
+  background-color: black;
+  color: whitesmoke;
+  font-size: 18px;
+  font-family: monospace;
+}
+
+body.canvas-focus {
+  overscroll-behavior: none;
+  overflow-y: hidden;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.flex {
+  display: flex;
+}
+
+.justify-evenly {
+  justify-content: space-evenly;
+}
+
+.m5 {
+  margin: 5px;
+}
+
+a {
+  color: whitesmoke;
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+  padding: 5px;
+  position: sticky;
+  background-color: black;
+}
+
+progress {
+  margin-right: 5px;
+}
+
+button {
+  font-size: 18px;
+  background: none;
+  color: white;
+  border: none;
+  cursor: pointer;
+}
+
+button.active {
+  color: gold;
+}
+
+button:active {
+  transform: translate(1px, 1px);
+}
+
+.button--testmode {
+  color: #36d23f;
+}
+
+.about, .settings {
+  margin: 0 5vw;
+}
+
+.quest-list {
+  display: grid;
+  grid-template-columns: 25vw 75vw;
+  height: 100vh;
+  overflow-y: scroll;
+}
+
+.quest-list__entries {
+  overflow-y: scroll;
+}
+
+.quest-list__sort {
+  display: flex;
+}
+
+.quest-list__sort-option {
+  cursor: pointer;
+  margin: 0 10px;
+}
+
+.quest-list__entry {
+  max-width: 20vw;
+  margin: 5px;
+  font-size: 16px;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: pointer;
+}
+
+.quest-list__current {
+  margin: 10px;
+}
+
+.top-section {
+  display: flex;
+  justify-content: space-between;
+}
+
+.quest-list__entry:hover {
+  background-color: #2a3333;
+}
+
+.quest-list__entry.selected {
+  padding-left: 5px;
+  color: gold;
+}
+
+.link-group {
+  display: flex;
+  flex-direction: column;
+  margin: 15px;
+  text-align: end;
+}
+
+.play-link {
+  font-size: 30px;
+}
+
+.emscripten {
+  display: flex;
+  align-items: center;
+
+  position: fixed;
+  margin: 3px;
+  right: 0;
+  top: 0;
+  z-index: 10000;
+}
+
+.content {
+  display: flex;
+  justify-content: center;
+}
+
+canvas {
+  border: 0 none;
+  image-rendering: pixelated;
+}
+
+.touch-inputs {
+  display: none;
+  margin: 15vh 5vh;
+  flex-grow: 1;
+  align-items: end;
+  justify-content: center;
+}
+
+@media only screen and (hover: none) {
+  .touch-inputs {
+    display: flex;
+  }
+}
+
+.touch-input {
+  color: white;
+  font-weight: bold;
+  padding: 15px 4px;
+  width: 100%;
+  height: 100%;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  pointer-events: all;
+  text-align: center;
+}
+
+.touch-input.pressed {
+  transform: translate(2px, 2px);
+}
+
+.dpad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.dpad .touch-input {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0;
+  width: 5vw;
+  height: 5vw;
+}
+
+.settings__browser-files {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-gap: 5px;
+  justify-items: center;
+}
+.file {
+  display: contents;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  padding: 5px;
+}
+.file:hover {
+  color: gold;
+}
+
+.permission {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  padding: 15vw;
+}
+
+.images {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  max-width: 100%;
+}
+.images img {
+  width: 12vw;
+  image-rendering: pixelated;
+}
+.current-image img {
+  height: max(40vh, 300px);
+  image-rendering: pixelated;
+}
+
+  </style>
+  <script>
+    var TARGET = "zplayer";
+    var IS_CI = false;
+
+    var rootUrl = new URL('..', location.href).href;
+    window.ZC_Constants = {
+      zeldaUrl: rootUrl + 'play',
+      zquestUrl: rootUrl + 'create',
+      patsUrl: rootUrl + 'timidity',
+      files: ["/.DS_Store", "/allegro.log", "/ProggyVector-Regular.ttf", "/5thmusic.nsf", "/README.txt", "/quests/the_deep.qst", "/music/Isabelle_Z1.nsf", "/music/Isabelle_Z2.nsf", "/include/EmilyMisc.zh", "/include/bindings.zh", "/include/string.zh", "/include/ffcscript.zh", "/include/std.zh", "/docs/Tile-Editor-Hotkeys.txt", "/docs/.DS_Store", "/docs/cset.txt", "/docs/enemies.txt", "/docs/packaging_quests.md", "/docs/defdraws.PNG", "/docs/README.txt", "/docs/ZScript_Docs.html", "/docs/zscript.txt", "/docs/string.txt", "/base_config/zscript_test.cfg", "/customfonts/customfonts.txt", "/headers/ghost.zh", "/headers/gui.zh", "/headers/tango.zh", "/templates/passive_alt.sub", "/templates/passive_new.sub", "/templates/passive_alt_keyless.sub", "/templates/active_new.sub", "/templates/passive_new_keyless.sub", "/templates/active_classic_altb.sub", "/templates/active_classic_altba.sub", "/templates/active_classic_newba.sub", "/templates/overlay_key.sub", "/templates/active_classic_newb.sub", "/assets/.DS_Store", "/assets/190_tiles.qst", "/themes/garnet.ztheme", "/themes/hotdog.ztheme", "/themes/mooshmood_light.ztheme", "/themes/darkblue.ztheme", "/themes/legacy190.ztheme", "/themes/190.ztheme", "/themes/legacy192.ztheme", "/themes/mooshmood.ztheme", "/themes/slate.ztheme", "/themes/ice.ztheme", "/themes/ruby.ztheme", "/themes/zsnes.ztheme", "/themes/Animal.ztheme", "/themes/avaro_darkpurple.ztheme", "/themes/Chocolate.ztheme", "/themes/dark.ztheme", "/themes/190alt.ztheme", "/tilesets/cambria.qst", "/quests/examples/trigger_example.qst", "/quests/examples/255example.qst", "/include/std_zh/std_functions.zh", "/include/std_zh/std.cfg", "/include/std_zh/std_time.zh", "/include/std_zh/std_constants.zh", "/include/std_zh/std_sideview.zh", "/include/std_zh/std_extension.zh", "/include/std_zh/limits.zh", "/include/std_zh/script_runners.zh", "/include/std_zh/std_keyboard.zh", "/include/std_zh/ghostBasedMovement.zh", "/include/bindings/sprite.zh", "/include/bindings/viewport.zh", "/include/bindings/common.zh", "/include/bindings/file.zh", "/include/bindings/bottledata.zh", "/include/bindings/text.zh", "/include/bindings/input.zh", "/include/bindings/spritedata.zh", "/include/bindings/ffc.zh", "/include/bindings/debug.zh", "/include/bindings/randgen.zh", "/include/bindings/stack.zh", "/include/bindings/itemdata.zh", "/include/bindings/messagedata.zh", "/include/bindings/zinfo.zh", "/include/bindings/subscreenwidget.zh", "/include/bindings/screendata.zh", "/include/bindings/directory.zh", "/include/bindings/combotrigger.zh", "/include/bindings/bitmap.zh", "/include/bindings/audio.zh", "/include/bindings/dmapdata.zh", "/include/bindings/mapdata.zh", "/include/bindings/subscreendata.zh", "/include/bindings/weapondata.zh", "/include/bindings/eweapon.zh", "/include/bindings/qrs.zh", "/include/bindings/hero.zh", "/include/bindings/websocket.zh", "/include/bindings/dropsetdata.zh", "/include/bindings/graphics.zh", "/include/bindings/shopdata.zh", "/include/bindings/savedportal.zh", "/include/bindings/portal.zh", "/include/bindings/npc.zh", "/include/bindings/bottleshopdata.zh", "/include/bindings/global.zh", "/include/bindings/paldata.zh", "/include/bindings/subscreenpage.zh", "/include/bindings/region.zh", "/include/bindings/combodata.zh", "/include/bindings/game.zh", "/include/bindings/filesystem.zh", "/include/bindings/itemsprite.zh", "/include/bindings/npcdata.zh", "/include/bindings/musicdata.zh", "/include/bindings/genericdata.zh", "/include/bindings/save_menu.zh", "/include/bindings/lweapon.zh", "/include/deprecated/sram.zh", "/include/deprecated/time.zh", "/include/deprecated/theRandomHeader.zh", "/include/std_zh/string/string_functions.zh", "/include/std_zh/string/string_constants.zh", "/docs/tango/README.txt", "/docs/ghost/README.txt", "/docs/zscript_technical/ZScript_Timing.txt", "/customfonts/example fonts/pfont.bmp", "/customfonts/example fonts/Shin_Megami_Tensei_SNES_Titles_font.bmp", "/customfonts/example fonts/kongfont.bmp", "/customfonts/example fonts/gboraclepfont.bmp", "/customfonts/example fonts/lfont.bmp", "/customfonts/example fonts/deffont.bmp", "/customfonts/example fonts/Undertale_and_Deltarune_font.bmp", "/customfonts/example fonts/mfont.bmp", "/customfonts/example fonts/hylian1font.bmp", "/customfonts/example fonts/atari400font.bmp", "/customfonts/example fonts/motfont.bmp", "/customfonts/example fonts/speclgfont.bmp", "/customfonts/example fonts/fantasyfon.bmp", "/customfonts/example fonts/zfont.bmp", "/customfonts/example fonts/zxfont.bmp", "/customfonts/example fonts/hylian3font.bmp", "/customfonts/example fonts/ssfont4.bmp", "/customfonts/example fonts/apple2font.bmp", "/customfonts/example fonts/sfont.bmp", "/customfonts/example fonts/cgafont.bmp", "/customfonts/example fonts/coupefon.bmp", "/customfonts/example fonts/Disorientation_font.bmp", "/customfonts/example fonts/c64hiresfont.bmp", "/customfonts/example fonts/trsfont.bmp", "/customfonts/example fonts/Wario_Land_4_font.bmp", "/customfonts/example fonts/ssfont3.bmp", "/customfonts/example fonts/apple280colfont.bmp", "/customfonts/example fonts/Betrayal_at_Krondor_font.bmp", "/customfonts/example fonts/adosfont.bmp", "/customfonts/example fonts/ssfont2.bmp", "/customfonts/example fonts/Gradius 3_AC_font.bmp", "/customfonts/example fonts/finalffont.bmp", "/customfonts/example fonts/atari800font.bmp", "/customfonts/example fonts/z3smallfont.bmp", "/customfonts/example fonts/zoranfont.bmp", "/customfonts/example fonts/hylian2font.bmp", "/customfonts/example fonts/nfont.bmp", "/customfonts/example fonts/Actraiser_font.bmp", "/customfonts/example fonts/saturnfont.bmp", "/customfonts/example fonts/c64font.bmp", "/customfonts/example fonts/Pokemon_GSC_font.bmp", "/customfonts/example fonts/cocofont.bmp", "/customfonts/example fonts/ssfont1.bmp", "/customfonts/example fonts/Super_Mario_RPG_Dialogue_font.bmp", "/customfonts/example fonts/lisafont.bmp", "/customfonts/example fonts/goronfont.bmp", "/customfonts/example fonts/Pixel_Wingdings_font.bmp", "/customfonts/example fonts/Super_Mario_World_Credits_font.bmp", "/customfonts/example fonts/Final_Fantasy_Six_font.bmp", "/customfonts/example fonts/BSZeldaFont.bmp", "/customfonts/example fonts/Fallout_Classic_font.bmp", "/customfonts/example fonts/BSZeldaProportionalFont.bmp", "/customfonts/example fonts/spectrumfont.bmp", "/customfonts/example fonts/aquariusfont.bmp", "/customfonts/example fonts/Earthworm_Jim_font.bmp", "/customfonts/example fonts/Megaman_Classic_NES_font.bmp", "/customfonts/example fonts/Gunstar Heroes Font.bmp", "/customfonts/example fonts/futharkfont.bmp", "/customfonts/example fonts/jpfont.bmp", "/customfonts/example fonts/cpcfon.bmp", "/customfonts/example fonts/sinqlfont.bmp", "/customfonts/example fonts/dsphantomfont.bmp", "/customfonts/example fonts/La_Mulana_MSX_font.bmp", "/customfonts/example fonts/manafont.bmp", "/customfonts/example fonts/ztfont.bmp", "/customfonts/example fonts/dsphantompfont.bmp", "/customfonts/example fonts/gaiafont.bmp", "/customfonts/example fonts/gblafont.bmp", "/customfonts/example fonts/ti99font.bmp", "/customfonts/example fonts/fdskanafon.bmp", "/customfonts/example fonts/baseallegrofont.bmp", "/customfonts/example fonts/lfont_l.bmp", "/customfonts/example fonts/Dracula_X_SNES_Credits_font.bmp", "/customfonts/example fonts/coco2font.bmp", "/customfonts/example fonts/apple2gsfont.bmp", "/customfonts/example fonts/msxmode1font.bmp", "/customfonts/example fonts/petfont.bmp", "/customfonts/example fonts/spfont.bmp", "/customfonts/example fonts/z3font.bmp", "/customfonts/example fonts/fdsromanfon.bmp", "/customfonts/example fonts/pstartfont.bmp", "/customfonts/example fonts/sherwoodfont.bmp", "/customfonts/example fonts/hylian4font.bmp", "/customfonts/example fonts/Betrayal_at_Krondor_Small_font.bmp", "/customfonts/example fonts/gboraclefont.bmp", "/customfonts/example fonts/Betrayal_at_Krondor_Moredhel_Runes_font.bmp", "/customfonts/example fonts/hirafont.bmp", "/customfonts/example fonts/mlfont.bmp", "/customfonts/example fonts/DOOM_Classic_font.bmp", "/customfonts/example fonts/fdslikefon.bmp", "/customfonts/example fonts/acornfont.bmp", "/customfonts/example fonts/sfont2.bmp", "/customfonts/example fonts/msxmode0font.bmp", "/customfonts/example fonts/EVO_Search_for_Eden_font.bmp", "/customfonts/example fonts/z2font.bmp", "/customfonts/example fonts/Super_Mario_World_Textbox_font_coin_version.bmp", "/customfonts/example fonts/chrono_trigger_proportional.bmp", "/customfonts/example fonts/sfont3.bmp", "/customfonts/example fonts/scififont.bmp", "/headers/examples/gui_example.zs", "/headers/examples/tango_example.zs", "/headers/gui_zh/guizh_common.zh", "/headers/gui_zh/guizh_button.zh", "/headers/gui_zh/guizh_main.zh", "/headers/gui_zh/guizh_checkbox.zh", "/headers/gui_zh/guizh_root.zh", "/headers/gui_zh/guizh_label.zh", "/headers/gui_zh/guizh_types.zh", "/headers/gui_zh/guizh_widget.zh", "/headers/gui_zh/guizh_window.zh", "/headers/gui_zh/guizh_radioButton.zh", "/headers/gui_zh/guizh_spinner.zh", "/headers/gui_zh/guizh_event.zh", "/headers/tango/1.3/tango_deprecated.zh", "/headers/tango/1.3/tango_stringControlCodeDisabled.zh", "/headers/tango/1.3/tango_access.zh", "/headers/tango/1.3/tango_menu.zh", "/headers/tango/1.3/tango_stringControlCode.zh", "/headers/tango/1.3/tango_loggingFull.zh", "/headers/tango/1.3/tango_loggingMinimal.zh", "/headers/tango/1.3/tango_processing.zh", "/headers/tango/1.3/tango_validation.zh", "/headers/tango/1.3/tango_script.zs", "/headers/tango/1.3/tango_style.zh", "/headers/tango/1.3/tango_functions.zh", "/headers/tango/1.3/tango_font.zh", "/headers/tango/1.3/tango_loading.zh", "/headers/tango/1.3/tango_metrics.zh", "/headers/tango/1.3/tango_user.zh", "/headers/tango/1.3/tango_common.zh", "/headers/tango/1.3/tango_messages.zh", "/headers/tango/1.3/tango_drawing.zh", "/headers/tango/font/tango_GUI.zh", "/headers/tango/font/tango_LttPSmall.zh", "/headers/tango/font/tango_Small.zh", "/headers/tango/font/tango_LA.zh", "/headers/tango/font/tango_NES.zh", "/headers/tango/font/tango_LttP.zh", "/headers/tango/font/tango_PhantomProportional.zh", "/headers/tango/font/tango_Matrix.zh", "/headers/tango/font/tango_Small2.zh", "/headers/tango/font/tango_GUINarrow.zh", "/headers/tango/font/tango_SS3.zh", "/headers/tango/font/tango_Oracle.zh", "/headers/tango/font/tango_Phantom.zh", "/headers/tango/font/tango_Allegro.zh", "/headers/tango/font/tango_OracleProportional.zh", "/headers/tango/font/tango_GUIBold.zh", "/headers/tango/font/tango_SmallProportional.zh", "/headers/ghost_zh/2.8/ghost2_deprecated.zh", "/headers/ghost_zh/2.8/ghost2_other.zh", "/headers/ghost_zh/2.8/ghost2_drawing.zh", "/headers/ghost_zh/2.8/ghost2_experimental2.zh", "/headers/ghost_zh/2.8/ghost2_init.zh", "/headers/ghost_zh/2.8/ghost2_flags.zh", "/headers/ghost_zh/2.8/ghost2_update.zh", "/headers/ghost_zh/2.8/ghost_experimental.zh", "/headers/ghost_zh/2.8/ghost2_eweaponMovement.zh", "/headers/ghost_zh/2.8/ghost2_experimental_movement.zh", "/headers/ghost_zh/2.8/ghost2_eweaponDeath.zh", "/headers/ghost_zh/2.8/ghost2_global.zh", "/headers/ghost_zh/2.8/ghost2_scripts.zs", "/headers/ghost_zh/2.8/ghost2_movement.zh", "/headers/ghost_zh/2.8/ghost2_eweapon.zh", "/headers/ghost_zh/2.8/ghost2_modification.zh", "/headers/ghost_zh/2.8/ghost2_experimental.zh", "/headers/ghost_zh/2.8/changelog.txt", "/headers/ghost_zh/2.8/ghost2_common.zh", "/assets/zc/ZC_Sword_Woosh.wav", "/assets/zc/ZC_Icon_Medium_Launcher.png", "/assets/zc/CREDITS.txt", "/assets/zc/ZC_Logo_Sword.png", "/assets/zc/LICENSE.txt", "/assets/zc/ZC_Logo_NoSword.png", "/themes/classic/gold.ztheme", "/themes/classic/pink.ztheme", "/themes/classic/blue.ztheme", "/themes/classic/classic.ztheme", "/themes/classic/win98.ztheme", "/themes/classic/win99.ztheme", "/themes/classic/dark.ztheme", "/themes/classic/october.ztheme"],
+    };
+  </script>
+
+  <!-- <link rel="apple-touch-icon" href="/iconx/apple-touch-icon.png"/> -->
+  <link rel="icon" type="image/x-icon" href="../favicon.ico">
+
+  <script>
+    const el = document.createElement('link');
+    el.rel = 'manifest';
+    el.href = '../manifest.json';
+    document.head.append(el);
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('../sw.js');
+      });
+    };
+
+    // <button class="panel-button" data-panel=".install-prompt">Install as App</button>
+    const installEl = document.createElement('button');
+    installEl.textContent = 'Install as App';
+    installEl.classList.add('panel-button');
+    installEl.addEventListener('click', async () => {
+      if (!deferredPrompt) return;
+
+      const { outcome } = await deferredPrompt.prompt();
+      if (outcome === 'accepted') {
+        deferredPrompt = undefined;
+        installEl.textContent = 'Installed! Open from home screen for better experience';
+        setTimeout(() => installEl.remove(), 1000 * 5);
+      }
+    });
+    window.addEventListener('appinstalled', () => {
+      deferredPrompt = undefined;
+      installEl.textContent = 'Installed! Open from home screen for better experience';
+      setTimeout(() => installEl.remove(), 1000 * 5);
+    });
+
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+
+      document.querySelector('.panel-buttons').append(installEl);
+    });
+
+    // Does this ever change in a page???
+    // answer: yes, on desktop chrome. no for android chrome ...
+    window.matchMedia('(display-mode: fullscreen)').addEventListener('change', (e) => {
+      if (document.fullscreen) return;
+
+      console.log('display-mode', e.matches);
+      if (e.matches) installEl.remove();
+    });
+
+    if (window.launchQueue && 'files' in LaunchParams.prototype) {
+      launchQueue.setConsumer((launchParams) => {
+        if (!launchParams.files.length) {
+          return;
+        }
+
+        const file = launchParams.files[0];
+        window.ZC_handleLaunchedFile = async (dirHandle) => {
+          const relativePaths = dirHandle && await dirHandle.resolve(file);
+          if (!relativePaths) {
+            alert("Sorry, you can only open .qst files that way if you've attached that folder. See Settings");
+            return;
+          }
+
+          const relativePath = relativePaths.join('/');
+          const quest = `local/${relativePath}`;
+          const params = { quest };
+          const openInEditor = confirm('Press OK to open in editor, cancel to play quest instead');
+          const url = ZC.createUrlString(openInEditor ? ZC_Constants.zquestUrl : ZC_Constants.zeldaUrl, params);
+          window.location.href = url;
+        };
+      });
+    }
+  </script>
+
+</head>
+
+<body>
+  <header>
+    <div class="panel-buttons">
+      <button class="hidden panel-button button--testmode" data-panel=".testmode">Test Mode Active</button>
+      <button class="panel-button" data-panel=".about">About</button>
+      <button class="panel-button" data-panel=".settings">Settings</button>
+      <button class="panel-button" data-panel=".quest-list">Quest List</button>
+      <button class="panel-button hidden button--copyurl">Copy URL</button>
+      <button class="panel-button hidden button--open-testmode">Test Mode</button>
+    </div>
+  </header>
+
+  <div>
+    <div class="hidden panel testmode">
+      The URL you navigated to has opened ZQuest Classic in a test mode. You won't be able to save in this mode.
+      Click <a href="https://zquestclassic.com/play/">here</a> to exit test mode.
+    </div>
+
+    <div class="hidden panel about">
+      <p>
+        <a href="https://web.zquestclassic.com/play/">Quest Player</a> – <a href="https://web.zquestclassic.com/create/">Quest Editor</a> – <a href="https://twitter.com/zelda_classic" target="_blank">Follow on Twitter</a>
+      </p>
+      <p>
+        This is an experimental version of ZQuest Classic for the browser. You can expect occasional sound hiccups, and
+        other bugs.
+        But for the most part things should work well enough to play any quest that the Windows version can handle.
+        For more, see <a href="https://hoten.cc/blog/porting-zelda-classic-to-the-web/" target="_blank">this blog post</a>.
+      </p>
+      <p>
+        Find a quest from the Quest List and hit Play to quicky load it. If a save file already exists, it will load
+        instantly.
+        Otherwise, it will load after you input a save file name.
+      </p>
+      <p>
+        Best enjoyed with a gamepad!
+
+        Controls can be configured in the Settings menu (click to open).
+
+      <!-- Updated by renderDefaultControls. -->
+      <div class="default-controls">Default Keyboard Controls
+        <div>A: z</div>
+        <div>B: x</div>
+        <div>L: q</div>
+        <div>R: w</div>
+        <div>Start: Enter</div>
+        <div>Map: space</div>
+        <div>Ex1 (X): a</div>
+        <div>Ex2 (Y): s</div>
+        <div>Ex3: d</div>
+        <div>Ex4: c</div>
+      </div>
+
+      </p>
+      <p>
+        To report issues, contact Connor (discord connorclark#9300) or <a target="_blank"
+        href="https://github.com/ZQuestClassic/ZQuestClassic/issues">open an issue</a> on the GitHub issue tracker.
+      </p>
+    </div>
+
+    <div class="hidden panel quest-list">
+      <div class="quest-list__entries">
+        <div class="quest-list__sort">
+          Sort by:
+          <div class="quest-list__sort-option">Rating</div>
+          <div class="quest-list__sort-option">Name</div>
+        </div>
+        <div class="quest-list__entries-list"></div>
+      </div>
+      <div class="quest-list__current"></div>
+    </div>
+
+    <div class="hidden panel settings">
+      <div>
+        Most settings (such as controls) are configured in the ZQuest Classic menu (click on game to open).
+        This panel is for web-specific settings.
+      </div>
+
+       <!-- Timidity cfg -->
+       <span class="settings__timidity">
+        <h3>Timidity config (MIDI)</h3>
+        <div>
+          There are multiple options for MIDI sound files. For this to take effect, you need to refresh after changing.
+          Some options are missing instruments. If in doubt, just use the first choice.
+          <br>
+          Note: this only impacts MIDI songs, not any other type of music.
+        </div>
+        <br>
+        <div class="settings__timidity-cfgs">
+          <select></select>
+        </div>
+      </span>
+
+      <!-- Chrome: open directory -> sync to /local -->
+      <span class="settings__attach">
+        <h3>Attach local filesystem folder</h3>
+        <div>
+          Assign a folder to keep save files and quests. Choose an empty
+          folder or a folder with existing files (make sure to backup anything important!)
+        </div>
+        <button class="attach">Attach</button>
+        <button class="unattach">Unattach</button>
+      </span>
+
+      <!-- FF: open directory -> write to /local -->
+      <span class="settings__copy">
+        <h3>Copy local filesystem files</h3>
+        <div>
+          Copy files to the local browser storage. These files will then be
+          available to ZQuest Classic. Any updates to these files by ZQuest Classic will exist
+          only in the browser–the originals will not be modified. In other words, this
+          is one-way.
+        </div>
+        <br>
+        <div>
+          Note: Browsers that support the File System Access API (ex: desktop Chrome, Edge) can attach
+          a folder permanently, and data will be synchronized. This browser does not support that API,
+          (or you opted to use local browser storage), so when you want these updated files back on your
+          filesystem, use the following section.
+        </div>
+        <button class="copy-folder">Copy folder</button>
+        <button class="copy-file">Copy file</button>
+      </span>
+
+      <!-- FF: Download any file in /local -->
+      <span class="settings__download">
+        <h3>Download files stored in the browser</h3>
+        <div>
+          These files are stored in the browser. Click to download any of them.
+        </div>
+        <br>
+        <div class="settings__browser-files"></div>
+      </span>
+    </div>
+  </div>
+
+  <main>
+    <div class="emscripten">
+      <progress value="0" max="100" id="progress"></progress>
+      <div id="status">Initializing...</div>
+    </div>
+    <div class="permission hidden">
+      <div class="already-attached">
+        The folder "<span class="folder-name"></span>" is attached. Press OK and approve
+        the browser permission prompt to continue.
+      </div>
+      <div class="not-attached">
+        Press OK, select a folder and approve the browser permission prompt to continue.
+      </div>
+      <div>
+        <div class="m5">
+          <button class="ok">OK</button>
+        </div>
+        <div class="m5">
+          <button class="cancel">No (store data in browser instead)</button>
+        </div>
+      </div>
+    </div>
+    <div class="file-handler hidden">
+      <button>Play</button>
+      <button>Edit</button>
+    </div>
+
+    <div class="content">
+      <div class="touch-inputs">
+        <div class="dpad">
+          <div class="touch-input" data-x="-1" data-y="-1"></div>
+          <div class="touch-input" data-x="0" data-y="-1">↑</div>
+          <div class="touch-input" data-x="1" data-y="-1"></div>
+          <div class="touch-input" data-x="-1" data-y="0">←</div>
+          <div></div>
+          <div class="touch-input" data-x="1" data-y="0">→</div>
+          <div class="touch-input" data-x="-1" data-y="1"></div>
+          <div class="touch-input" data-x="0" data-y="1">↓</div>
+          <div class="touch-input" data-x="1" data-y="1"></div>
+        </div>
+      </div>
+
+      <canvas id="canvas" oncontextmenu="event.preventDefault()"></canvas>
+
+      <div class="touch-inputs">
+        <div style="width: 100%">
+          <div class="flex justify-evenly" style="margin: 5vh 0">
+            <div class="touch-input" data-action="Start">Start</div>
+            <div class="touch-input" data-action="Map">Map</div>
+          </div>
+          <div class="flex justify-evenly" style="margin: 5vh 0">
+            <div class="touch-input" data-action="L">L</div>
+            <div class="touch-input" data-action="R">R</div>
+          </div>
+          <div class="flex justify-evenly" style="margin: 5vh 0">
+            <div class="touch-input" data-action="B">B</div>
+            <div class="touch-input" data-action="A">A</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <template class="tmpl-selected-quest">
+    <div>
+      <div class="top-section">
+        <div>
+          <div><span class="name"></span></div>
+
+          <div>By: <span class="author"></span></div>
+          <div>Genre: <span class="genre"></span></div>
+          <div>ZC Version: <span class="version"></span></div>
+          <div class="_rating">Rating: <span class="rating"></span> (<span class="rating-votes"></span> reviews)</div>
+          <div>
+            <a class="purezc-link" target="_blank">View on PureZC</a>
+          </div>
+        </div>
+        <div class="links"></div>
+      </div>
+
+      <br>
+      <div class="information"></div>
+      <br>
+
+      <div class="current-image"></div>
+      <div class="images"></div>
+
+      <h3>Description</h3>
+      <div class="description"></div>
+
+      <h3>Story</h3>
+      <div class="story"></div>
+
+      <h3>Tips and Cheats</h3>
+      <div class="tips"></div>
+
+      <h3>Credits</h3>
+      <div class="credits"></div>
+    </div>
+  </template>
+
+  <script src="../main.js"></script>
+  <script src="../zplayer.js"></script>
+<script src="../zplayer.data.js"></script>
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-36Y8HGSBRW"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag() { dataLayer.push(arguments); }
+    gtag('js', new Date());
+
+    gtag('config', 'G-36Y8HGSBRW');
+  </script>
+</body>
+
+</html>

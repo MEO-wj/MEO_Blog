@@ -1,0 +1,70 @@
+{
+  "mario": {
+    "repository": "https://github.com/dataquestio/FullScreenMario",
+    "revision": "96a1e362dc9472f4a3d0bf7307bc9ffbc03c8bb4"
+  },
+  "zelda": {
+    "repository": "https://github.com/ZQuestClassic/ZQuestClassic",
+    "sourceRevision": "877f744fd939a1d25c093d8a926e92d0d4d5235e",
+    "runtimeVersion": "3.0.0-prerelease.212+2026-08-16",
+    "sourceTag": "3.0.0-prerelease.212+2026-08-16",
+    "runtimeSource": "https://web.zquestclassic.com/play/",
+    "quest": "https://www.purezc.net/index.php?page=quests&id=591"
+  },
+  "downloads": [
+    {
+      "url": "https://web.zquestclassic.com/main.js",
+      "path": "web/public/game-assets/zelda/v1/main.js",
+      "bytes": 32967,
+      "sha256": "d373d1449fadd1b77c625531cd22038a40f52bada3b2a6604e9b538d692d4e4c"
+    },
+    {
+      "url": "https://web.zquestclassic.com/zplayer.js",
+      "path": "web/public/game-assets/zelda/v1/zplayer.js",
+      "bytes": 278475,
+      "sha256": "1f2e88a29529c15f4274d72123cda7b5a7aefcdc588936e9d4692514662ae061"
+    },
+    {
+      "url": "https://web.zquestclassic.com/zplayer.wasm",
+      "path": "web/public/game-assets/zelda/v1/zplayer.wasm",
+      "bytes": 19668200,
+      "sha256": "4af2c978d69ed6029722126f8ec8b3aefcefa2d84caf1fba2bf20ec119c65111"
+    },
+    {
+      "url": "https://web.zquestclassic.com/zplayer.data.js",
+      "path": "web/public/game-assets/zelda/v1/zplayer.data.js",
+      "bytes": 15654,
+      "sha256": "ae3735589c54b4bb30fba742694936697c9b45a2cc2ed74f54bc144b2b669a61"
+    },
+    {
+      "url": "https://web.zquestclassic.com/zplayer.data",
+      "path": "web/public/game-assets/zelda/v1/zplayer.data",
+      "bytes": 8875915,
+      "sha256": "95e35c15b00a9d4ec0af2e533a5d9fef60d2c9d15d77af3cd3d2f0ecbf802e09"
+    },
+    {
+      "url": "https://web.zquestclassic.com/play/",
+      "path": "third_party/games/zelda/official-player.html",
+      "bytes": 28055,
+      "sha256": "e15421a91e67879097d128af1acd91755cc88bebcf5f0cbd95928a88fcd05721"
+    },
+    {
+      "url": "https://data.zquestclassic.com/quests/purezc/591/r01/1stClassic.qst",
+      "path": "web/public/game-assets/zelda/v1/1stClassic.qst",
+      "bytes": 909825,
+      "sha256": "91ff3e85bbbaf98f4b87d512a8fb0f15e9fa721f18c38cd743e7a658ed7bb829"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/ZQuestClassic/ZQuestClassic/877f744fd939a1d25c093d8a926e92d0d4d5235e/LICENSE",
+      "path": "third_party/games/zelda/LICENSE",
+      "bytes": 35147,
+      "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903"
+    },
+    {
+      "url": "https://codeload.github.com/ZQuestClassic/ZQuestClassic/tar.gz/877f744fd939a1d25c093d8a926e92d0d4d5235e",
+      "path": "web/public/game-assets/zelda/v1/source-877f744f.tar.gz",
+      "bytes": 95295213,
+      "sha256": "8df9e54a14c761c20bc3df21f3d6adcdcad5d5e725abbe70a2236300aacfdc12"
+    }
+  ]
+}

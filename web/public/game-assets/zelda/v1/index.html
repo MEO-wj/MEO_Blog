@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="zh-CN" data-game="zelda">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="icon" href="data:,"><title>塞尔达传说 · MEO_Blog</title>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; worker-src 'self' blob:; connect-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' blob:">
+  <style>html,body{height:100%;margin:0;background:#000;color:#ddd;overflow:hidden}body{display:grid;place-items:center}canvas{image-rendering:pixelated;outline:none}#status{position:absolute;inset:0;display:grid;place-items:center;background:#080b10;font:15px system-ui;text-align:center;padding:24px}#status[hidden]{display:none}</style>
+</head>
+<body>
+  <canvas id="canvas" tabindex="0" oncontextmenu="event.preventDefault()"></canvas><div id="status">正在准备塞尔达…</div>
+  <script>var TARGET='playground';var IS_CI=false;var rootUrl=new URL('.',location.href).href;window.ZC_Constants={files:[],patsUrl:rootUrl+'timidity/'};</script>
+  <script src="../../common/runtime.js"></script>
+  <script src="main.js"></script>
+  <script src="adapter.js"></script>
+</body></html>

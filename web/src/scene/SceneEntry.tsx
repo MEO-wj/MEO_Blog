@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useLocation, useNavigate } from "react-router-dom";
 import { OrbitControls } from "@react-three/drei";
@@ -8,6 +8,9 @@ import { SceneLoader } from "./SceneLoader";
 import { useSceneLayout } from "./useSceneLayout";
 import { LoadingOverlay } from "./LoadingOverlay";
 import { getSwitchRouteState, isSwitchModalRoute } from "../features/switch-ui/switchRoutes";
+import { findGame } from '../features/games/gameRegistry';
+
+const GameHost = lazy(() => import('../features/games/GameHost').then(module => ({ default: module.GameHost })));
 
 const DESKTOP_FOV = 42;
 const MOBILE_FOV = 58;
@@ -97,6 +100,8 @@ export function SceneEntry() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const routeState = getSwitchRouteState(pathname);
+  const inGame = routeState.kind === 'game';
+  const game = inGame ? findGame(routeState.gameId) : undefined;
   const { layout, error: layoutError } = useSceneLayout();
   const [screenFocused, setScreenFocused] = useState(() => isSwitchModalRoute(routeState.kind));
   const [screenResetSignal, setScreenResetSignal] = useState(0);
@@ -113,6 +118,7 @@ export function SceneEntry() {
   }
 
   function resetScreenHome() {
+    if (inGame) { navigate('/'); return; }
     setScreenFocused(false);
     setScreenResetSignal((value) => value + 1);
   }
@@ -128,6 +134,7 @@ export function SceneEntry() {
     <div className="w-full h-full relative" style={{ width: "100%", height: "100%", position: "relative" }}>
       <LoadingOverlay layoutReady={layout !== null} layoutError={layoutError} />
       <Canvas
+        frameloop={inGame ? 'never' : 'always'}
         dpr={[1, 1.5]}
         shadows
         camera={{ fov: DESKTOP_FOV, near: 0.1, far: 240, position: cameraPos }}
@@ -167,6 +174,12 @@ export function SceneEntry() {
           )}
         </Suspense>
       </Canvas>
+
+      {inGame && (game ? <Suspense fallback={<div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: '#191b20', color: '#eee', display: 'grid', placeItems: 'center' }}>正在打开游戏…</div>}>
+        <GameHost key={game.gameId} game={game} onExit={() => { setScreenFocused(true); navigate('/'); }} />
+      </Suspense> : <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: '#191b20', color: '#eee', display: 'grid', placeItems: 'center' }}>
+        <div><p>这个游戏不存在</p><button onClick={() => navigate('/')}>返回主页</button></div>
+      </div>)}
 
       {!screenFocused && <div className="absolute left-4 bottom-4 flex items-center gap-2.5 px-3 py-2 rounded-lg border border-accent/20 bg-surface/70 backdrop-blur-sm text-xs text-text-dim pointer-events-none">
         <span className="w-2 h-2 rounded-full bg-primary shadow-[0_0_12px_rgba(99,230,190,0.9)]" />

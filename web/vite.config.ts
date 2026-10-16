@@ -27,6 +27,17 @@ function rootStaticFiles(): Plugin {
         next();
       });
     },
+    configurePreviewServer(server) {
+      const root = path.resolve(__dirname, '..');
+      server.middlewares.use((req, res, next) => {
+        if (!req.url?.startsWith('/model/')) return next();
+        const base = path.join(root, 'model');
+        const filename = path.resolve(root, '.' + req.url.split('?')[0]);
+        if (!filename.startsWith(base + path.sep) || !fs.existsSync(filename) || !fs.statSync(filename).isFile()) { res.statusCode = 404; res.end(); return; }
+        res.setHeader('Content-Type', 'model/gltf-binary');
+        fs.createReadStream(filename).pipe(res);
+      });
+    },
   };
 }
 

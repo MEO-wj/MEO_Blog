@@ -15,6 +15,8 @@ import {
   type SwitchHomeProject,
 } from "./switchHomeData";
 import { ProjectCard } from "./ProjectCard";
+import { GameCard } from '../games/GameCard';
+import { desktopGames, isGameEntry } from '../games/gameRegistry';
 import { ActionButton } from "./ActionButton";
 import { AdminPanel } from "./AdminPanel";
 import { ProjectDetail } from "./ProjectDetail";
@@ -228,9 +230,10 @@ export function SwitchHomeScreen({
 
   const projectItems = useMemo(() => {
     const source = (storeProjects.length > 0 ? storeProjects : switchHomeProjects).slice(0, HOME_PROJECT_LIMIT);
-    if (source.length >= MIN_PROJECT_SLOTS) return source;
+    if (source.length >= MIN_PROJECT_SLOTS) return [...desktopGames, ...source];
 
     return [
+      ...desktopGames,
       ...source,
       ...Array.from(
         { length: MIN_PROJECT_SLOTS - source.length },
@@ -331,6 +334,21 @@ export function SwitchHomeScreen({
     navigate("/");
   }
 
+  function openHomeEntry(entry: SwitchHomeProject) {
+    if (entry.icon === 'empty') return;
+    onRequestFocus();
+    navigate(isGameEntry(entry) ? `/games/${entry.gameId}` : `/projects/${entry.id}`);
+  }
+
+  useEffect(() => {
+    const returned = (event: Event) => {
+      const index = desktopGames.findIndex(game => game.gameId === (event as CustomEvent<string>).detail);
+      if (index >= 0) { setSelectedProject(index); setHoveredProject(-1); setFocusZone('projects'); }
+    };
+    window.addEventListener('meo-game-return', returned);
+    return () => window.removeEventListener('meo-game-return', returned);
+  }, []);
+
   useEffect(() => {
     setSelectedProject(0);
     setHoveredProject(-1);
@@ -347,7 +365,7 @@ export function SwitchHomeScreen({
   }, [resetSignal]);
 
   useEffect(() => {
-    if (!focused) return;
+    if (!focused || routeState.kind === 'game') return;
 
     function onKeyDown(event: KeyboardEvent) {
       if (showGithub) {
@@ -487,7 +505,7 @@ export function SwitchHomeScreen({
           if (selectedProject === moreProjectIndex) {
             navigate("/projects");
           } else if (currentProject.icon !== "empty") {
-            void openProjectDetail(currentProject);
+            openHomeEntry(currentProject);
           }
         } else if (currentAction) {
           activateAction(currentAction.id);
@@ -502,7 +520,7 @@ export function SwitchHomeScreen({
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [adminPromptOpen, currentAction?.id, currentProject, detailProject, focusZone, focused, moreProjectIndex, navigate, onRequestExit, playSound, projectNavigationCount, selectedProject, showBlog, showFavorites, showGithub, showGuestbook, showProjectLibrary, showResume, visibleActions.length]);
+  }, [adminPromptOpen, currentAction?.id, currentProject, detailProject, focusZone, focused, moreProjectIndex, navigate, onRequestExit, playSound, projectNavigationCount, selectedProject, showBlog, showFavorites, showGithub, showGuestbook, showProjectLibrary, showResume, visibleActions.length, routeState.kind]);
 
   function resetAdminGate() {
     adminGateCodeRef.current = "";
@@ -795,6 +813,10 @@ export function SwitchHomeScreen({
             </div>
           </div>
           {projectItems.map((project, index) => (
+            isGameEntry(project) ? <GameCard key={project.id} game={project}
+              selected={focusZone === 'projects' && activeProjectIndex === index} dragging={projectDragging}
+              onSelect={() => { setFocusZone('projects'); setSelectedProject(index); setHoveredProject(index); playProjectHover(); }}
+              onDeselect={() => setHoveredProject(-1)} onOpen={() => { playProjectClick(); openHomeEntry(project); }} /> :
             <ProjectCard
               key={project.id}
               project={project}
@@ -808,9 +830,7 @@ export function SwitchHomeScreen({
               onDeselect={() => {
                 setHoveredProject(-1);
               }}
-              onOpen={async () => {
-                navigate(`/projects/${project.id}`);
-              }}
+              onOpen={() => openHomeEntry(project)}
               onOpenRepo={() => openExternal(project.repoUrl)}
               onHoverSound={playProjectHover}
               onClickSound={project.icon !== "empty" ? playProjectClick : undefined}

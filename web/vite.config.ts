@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "node:path";
 import fs from "node:fs";
+import type { IncomingMessage, ServerResponse } from 'node:http';
 
 function rootStaticFiles(): Plugin {
   return {
@@ -41,14 +42,39 @@ function rootStaticFiles(): Plugin {
   };
 }
 
+const gameHeaders = {
+  "Cross-Origin-Opener-Policy": "same-origin",
+  "Cross-Origin-Embedder-Policy": "credentialless",
+};
+
+function gameAssetFiles(): Plugin {
+  const middleware = (req: IncomingMessage, res: ServerResponse, next: () => void) => {
+    if (!req.url?.startsWith("/game-assets/")) return next();
+    let pathname: string;
+    try { pathname = decodeURIComponent(req.url.split("?")[0]); } catch { res.statusCode = 400; res.end(); return; }
+    const base = path.resolve(__dirname, "public/game-assets");
+    const filename = path.resolve(__dirname, "public", `.${pathname}`);
+    if (!filename.startsWith(base + path.sep) || !fs.existsSync(filename) || !fs.statSync(filename).isFile()) {
+      res.statusCode = 404; res.end("Game resource not found"); return;
+    }
+    next();
+  };
+  return {
+    name: "game-assets-no-spa-fallback",
+    configureServer(server) { server.middlewares.use(middleware); },
+    configurePreviewServer(server) { server.middlewares.use(middleware); },
+  };
+}
+
 export default defineConfig({
-  plugins: [react(), tailwindcss(), rootStaticFiles()],
+  plugins: [react(), tailwindcss(), rootStaticFiles(), gameAssetFiles()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
   },
   server: {
+    headers: gameHeaders,
     host: "127.0.0.1",
     port: 5174,
     proxy: {
@@ -58,6 +84,7 @@ export default defineConfig({
       allow: [".."],
     },
   },
+  preview: { headers: gameHeaders },
   build: {
     rollupOptions: {
       output: {

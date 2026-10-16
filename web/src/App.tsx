@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { createBrowserRouter, createRoutesFromElements, RouterProvider, Route, Link, useLocation } from "react-router-dom";
 import { Layout } from "./app/Layout";
 
 const SceneEntry = lazy(() => import("./scene/SceneEntry").then(m => ({ default: m.SceneEntry })));
@@ -41,25 +41,30 @@ function RootLoader() {
   );
 }
 
-function useIsMobileHome() {
+function useIsMobileHome(inGame: boolean) {
   const [isMobile, setIsMobile] = useState(shouldUseMobileHome);
 
   useEffect(() => {
     const media = window.matchMedia(MOBILE_HOME_MEDIA);
     const onChange = () => {
-      if (media.matches) setIsMobile(true);
+      if (media.matches && !inGame) setIsMobile(true);
     };
 
     onChange();
     media.addEventListener("change", onChange);
     return () => media.removeEventListener("change", onChange);
-  }, []);
+  }, [inGame]);
 
   return isMobile;
 }
 
 function HomeEntry() {
-  const isMobile = useIsMobileHome();
+  const inGame = useLocation().pathname.startsWith('/games/');
+  const isMobile = useIsMobileHome(inGame);
+
+  if (isMobile && inGame) return <div style={{ minHeight: '100dvh', background: '#191b20', color: '#eee', display: 'grid', placeItems: 'center', padding: 24 }}><div>
+    <h1>游戏仅在电脑端提供</h1><p>请使用电脑浏览器和键盘打开游戏。</p><Link to="/" style={{ color: '#62d9c8' }}>返回博客主页</Link>
+  </div></div>;
 
   return (
     <Suspense fallback={<RootLoader />}>
@@ -68,10 +73,8 @@ function HomeEntry() {
   );
 }
 
-export function App() {
-  return (
-    <BrowserRouter>
-      <Routes>
+const router = createBrowserRouter(createRoutesFromElements(
+      <>
         <Route path="/" element={<HomeEntry />} />
         <Route path="/github" element={<HomeEntry />} />
         <Route path="/blog" element={<HomeEntry />} />
@@ -83,12 +86,13 @@ export function App() {
         <Route path="/admin" element={<HomeEntry />} />
         <Route path="/projects" element={<HomeEntry />} />
         <Route path="/projects/:projectId" element={<HomeEntry />} />
+        <Route path="/games/:gameId" element={<HomeEntry />} />
         <Route element={<Layout />}>
           <Route path="/dashboard" element={<Suspense fallback={<PageLoader />}><DashboardPage /></Suspense>} />
           <Route path="/games" element={<Suspense fallback={<PageLoader />}><GamesPage /></Suspense>} />
           <Route path="/about" element={<Suspense fallback={<PageLoader />}><AboutPage /></Suspense>} />
         </Route>
-      </Routes>
-    </BrowserRouter>
-  );
-}
+      </>
+));
+
+export function App() { return <RouterProvider router={router} />; }

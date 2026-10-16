@@ -8,12 +8,14 @@ export type SwitchRouteKind =
   | "favorites"
   | "admin"
   | "projects"
-  | "project";
+  | "project"
+  | "game";
 
 export interface SwitchRouteState {
   kind: SwitchRouteKind;
   postId?: string;
   projectId?: string;
+  gameId?: string;
 }
 
 function segment(value: string) {
@@ -33,6 +35,7 @@ export function getSwitchRouteState(pathname: string): SwitchRouteState {
   if (root === "favorites") return { kind: "favorites" };
   if (root === "admin") return { kind: "admin" };
   if (root === "projects") return id ? { kind: "project", projectId: id } : { kind: "projects" };
+  if (root === "games" && id) return { kind: "game", gameId: id };
 
   return { kind: "home" };
 }
